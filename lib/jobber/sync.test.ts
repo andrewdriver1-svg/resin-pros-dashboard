@@ -121,8 +121,7 @@ describe('defensive node mappers', () => {
       id: 'gid://i1',
       invoiceNumber: 3015,
       invoiceStatus: 'partial',
-      total: 24250,
-      amountPaid: 12125,
+      amounts: { total: 24250, invoiceBalance: 12125 },
       client: { name: 'Kettle Ridge' },
     });
     expect(inv!.amount).toBe(24250);
