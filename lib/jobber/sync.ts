@@ -167,8 +167,8 @@ export function mapJobberInvoice(node: JobberInvoiceNode): Invoice | null {
     console.warn('[jobber] skipping invoice node with no id.');
     return null;
   }
-  const amount = typeof node.total === 'number' ? node.total : 0;
-  const amountPaid = typeof node.amountPaid === 'number' ? node.amountPaid : 0;
+  const amount = typeof node.amounts?.total === 'number' ? node.amounts.total : 0;
+    const amountPaid = typeof node.amounts?.paymentsTotal === 'number' ? node.amounts.paymentsTotal : 0;
   return {
     id: node.id,
     jobberId: node.id,
