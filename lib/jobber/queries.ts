@@ -60,8 +60,7 @@ export const INVOICES_QUERY = /* GraphQL */ `
         id
         invoiceNumber
         invoiceStatus
-        total
-        amountPaid
+        amounts { total paymentsTotal }
         issuedDate
         dueDate
         client { id name }
@@ -123,8 +122,7 @@ export interface JobberInvoiceNode {
   id?: string;
   invoiceNumber?: number | string;
   invoiceStatus?: string;
-  total?: number;
-  amountPaid?: number;
+  amounts?: { total?: number; paymentsTotal?: number };
   issuedDate?: string;
   dueDate?: string;
   client?: JobberClientRef;
