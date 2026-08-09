@@ -168,7 +168,8 @@ export function mapJobberInvoice(node: JobberInvoiceNode): Invoice | null {
     return null;
   }
   const amount = typeof node.amounts?.total === 'number' ? node.amounts.total : 0;
-    const amountPaid = typeof node.amounts?.paymentsTotal === 'number' ? node.amounts.paymentsTotal : 0;
+    const balance = typeof node.amounts?.invoiceBalance === 'number' ? node.amounts.invoiceBalance : 0;
+    const amountPaid = Math.max(0, amount - balance);
   return {
     id: node.id,
     jobberId: node.id,
