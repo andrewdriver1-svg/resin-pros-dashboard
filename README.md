@@ -86,6 +86,7 @@ See `.env.example` for the full list. Summary:
 |---|---|---|
 | Supabase | `NEXT_PUBLIC_SUPABASE_URL`, `NEXT_PUBLIC_SUPABASE_ANON_KEY`, `SUPABASE_SERVICE_ROLE_KEY` | Enables persistence + magic-link auth. Data layer reads Supabase instead of fixtures. |
 | Jobber | `JOBBER_CLIENT_ID`, `JOBBER_CLIENT_SECRET`, `JOBBER_WEBHOOK_SECRET`, `JOBBER_API_VERSION` | Enables OAuth connect + webhook sync. |
+| QuickBooks | `QUICKBOOKS_CLIENT_ID`, `QUICKBOOKS_CLIENT_SECRET`, `QUICKBOOKS_ENV` | Enables OAuth connect + daily spending sync into the Spending page. |
 | App | `APP_URL`, `CRON_SECRET` | OAuth redirect base + guards the cron reconcile endpoint. |
 
 ---
@@ -129,6 +130,30 @@ See `.env.example` for the full list. Summary:
 > `lib/jobber/sync.ts` reads every field defensively and logs a specific warning
 > if one is missing, so correcting a rename is a one-line change in
 > `lib/jobber/queries.ts`.
+
+---
+
+## QuickBooks setup (spending & banking)
+
+1. Run `supabase/migration-quickbooks.sql` in the Supabase SQL editor (adds the
+   `quickbooks_oauth` token table + a `qbo_id` column on `transactions`).
+2. Create an app at <https://developer.intuit.com/> (sign in with the company's
+   Intuit account → **Create an app** → QuickBooks Online and Payments →
+   scope **Accounting**). Under *Keys & credentials* (Production), add the
+   redirect URI `${APP_URL}/api/quickbooks/callback` exactly.
+3. Set `QUICKBOOKS_CLIENT_ID` / `QUICKBOOKS_CLIENT_SECRET` (and
+   `QUICKBOOKS_ENV=production`) in Vercel, redeploy.
+4. In the dashboard: **Settings → Connect QuickBooks** and authorize. Tokens
+   (plus the company `realmId`) persist in `quickbooks_oauth` and auto-refresh.
+5. Spending syncs on the daily cron (`/api/cron/reconcile`): QuickBooks
+   **Purchase** transactions (checks, card charges, cash expenses) upsert into
+   `transactions` by `qbo_id`, mapped to spending categories by expense-account
+   name (`lib/quickbooks/sync.ts → mapAccountNameToCategory`). Unmatched spend
+   lands in *Uncategorized* for hand-triage on the Spending page. The first sync
+   backfills 365 days; later runs are incremental.
+
+> Note: Intuit refresh tokens expire after ~100 days **without use**; the daily
+> cron keeps the connection alive automatically.
 
 ---
 
