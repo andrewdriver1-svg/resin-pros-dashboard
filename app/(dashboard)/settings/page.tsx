@@ -113,12 +113,24 @@ async function QuickBooksCard() {
                 : 'Authorize once to start syncing spending & banking.'}
             </p>
           </div>
-          <a
-            href="/api/quickbooks/connect"
-            className="inline-flex items-center rounded-lg bg-slate-900 px-4 py-2 text-sm font-medium text-white transition hover:bg-slate-700"
-          >
-            {connected ? 'Reconnect QuickBooks' : 'Connect QuickBooks'}
-          </a>
+          <div className="flex items-center gap-2">
+            {connected && (
+              <form action="/api/quickbooks/disconnect" method="post">
+                <button
+                  type="submit"
+                  className="inline-flex items-center rounded-lg border border-slate-300 px-4 py-2 text-sm font-medium text-slate-700 transition hover:bg-slate-50"
+                >
+                  Disconnect
+                </button>
+              </form>
+            )}
+            <a
+              href="/api/quickbooks/connect"
+              className="inline-flex items-center rounded-lg bg-slate-900 px-4 py-2 text-sm font-medium text-white transition hover:bg-slate-700"
+            >
+              {connected ? 'Reconnect QuickBooks' : 'Connect QuickBooks'}
+            </a>
+          </div>
         </div>
       )}
     </Card>
