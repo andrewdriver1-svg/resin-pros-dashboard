@@ -26,6 +26,7 @@ const REDIRECT_URI = `${APP_URL}/api/quickbooks/callback`;
 
 export const QBO_AUTHORIZE_URL = 'https://appcenter.intuit.com/connect/oauth2';
 export const QBO_TOKEN_URL = 'https://oauth.platform.intuit.com/oauth2/v1/tokens/bearer';
+export const QBO_REVOKE_URL = 'https://developer.api.intuit.com/v2/oauth2/tokens/revoke';
 export const QBO_SCOPE = 'com.intuit.quickbooks.accounting';
 /** Pin a minor version so response shapes don't drift under us. */
 export const QBO_MINOR_VERSION = '75';
@@ -147,6 +148,34 @@ export async function loadQuickBooksTokens(): Promise<QuickBooksTokens | null> {
     expiresAt: data.expires_at ? new Date(data.expires_at).getTime() : 0,
     lastSyncedAt: typeof data.last_synced_at === 'string' ? data.last_synced_at : null,
   };
+}
+
+/**
+ * Revoke the connection at Intuit. Sends the refresh token to the revoke
+ * endpoint, which invalidates the whole grant (both tokens). Safe to call with
+ * an already-invalid token — Intuit answers 200 either way.
+ */
+export async function revokeQuickBooksToken(refreshToken: string): Promise<void> {
+  const basic = Buffer.from(`${CLIENT_ID}:${CLIENT_SECRET}`).toString('base64');
+  const res = await fetch(QBO_REVOKE_URL, {
+    method: 'POST',
+    headers: {
+      Authorization: `Basic ${basic}`,
+      'Content-Type': 'application/json',
+      Accept: 'application/json',
+    },
+    body: JSON.stringify({ token: refreshToken }),
+  });
+  if (!res.ok) {
+    throw new Error(`QuickBooks revoke failed (${res.status}): ${await res.text().catch(() => '')}`);
+  }
+}
+
+/** Forget the stored connection locally. */
+export async function clearQuickBooksTokens(): Promise<void> {
+  const admin = createSupabaseAdminClient();
+  if (!admin) return;
+  await admin.from('quickbooks_oauth').delete().eq('id', OAUTH_ROW_ID);
 }
 
 /** Record a successful sync time so the next run can query incrementally. */
