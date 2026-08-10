@@ -2,6 +2,7 @@ import { Suspense } from 'react';
 import { businessConfig } from '@/config/business.config';
 import { getGoogleBusinessSnapshot } from '@/lib/db';
 import { isJobberConfigured, loadJobberTokens } from '@/lib/jobber/client';
+import { isQuickBooksConfigured, loadQuickBooksTokens } from '@/lib/quickbooks/client';
 import { isSupabaseConfigured } from '@/lib/supabase/env';
 import { PageHeader, Card } from '@/app/components/ui';
 import { TableSkeleton } from '@/app/components/states';
@@ -26,6 +27,10 @@ export default function SettingsPage() {
 
       <Suspense fallback={<TableSkeleton rows={2} />}>
         <JobberCard />
+      </Suspense>
+
+      <Suspense fallback={<TableSkeleton rows={2} />}>
+        <QuickBooksCard />
       </Suspense>
 
       <Card title="Google Business Profile & social">
@@ -77,6 +82,42 @@ async function JobberCard() {
             className="inline-flex items-center rounded-lg bg-slate-900 px-4 py-2 text-sm font-medium text-white transition hover:bg-slate-700"
           >
             {connected ? 'Reconnect Jobber' : 'Connect Jobber'}
+          </a>
+        </div>
+      )}
+    </Card>
+  );
+}
+
+async function QuickBooksCard() {
+  const configured = isQuickBooksConfigured();
+  const tokens = configured ? await loadQuickBooksTokens() : null;
+  const connected = Boolean(tokens?.accessToken && tokens?.realmId);
+
+  return (
+    <Card title="QuickBooks connection">
+      {!configured ? (
+        <p className="text-sm text-slate-500">
+          QuickBooks OAuth credentials aren&apos;t set. Add <code className="rounded bg-slate-100 px-1 py-0.5">QUICKBOOKS_CLIENT_ID</code> and{' '}
+          <code className="rounded bg-slate-100 px-1 py-0.5">QUICKBOOKS_CLIENT_SECRET</code> (see README), then connect.
+        </p>
+      ) : (
+        <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+          <div className="text-sm">
+            <span className={`inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium ${connected ? 'bg-emerald-100 text-emerald-800' : 'bg-amber-100 text-amber-800'}`}>
+              {connected ? 'Connected' : 'Not connected'}
+            </span>
+            <p className="mt-1 text-slate-500">
+              {connected
+                ? 'Spending syncs from QuickBooks into the Spending page daily.'
+                : 'Authorize once to start syncing spending & banking.'}
+            </p>
+          </div>
+          <a
+            href="/api/quickbooks/connect"
+            className="inline-flex items-center rounded-lg bg-slate-900 px-4 py-2 text-sm font-medium text-white transition hover:bg-slate-700"
+          >
+            {connected ? 'Reconnect QuickBooks' : 'Connect QuickBooks'}
           </a>
         </div>
       )}
