@@ -1,10 +1,77 @@
 import { describe, expect, it } from 'vitest';
 import {
+  expenseAccountIds,
+  isSpendPurchase,
   mapAccountNameToCategory,
   mapPaymentAccount,
   purchaseToTransaction,
+  type QboAccount,
   type QboPurchase,
 } from './sync';
+
+// A slice of the real Resin Pros chart of accounts.
+const chartOfAccounts: QboAccount[] = [
+  { Id: '1', Name: 'BUS COMPLETE CHK (5039)', AccountType: 'Bank' },
+  { Id: '2', Name: 'Blue Business Plus Card (1002)', AccountType: 'Bank' },
+  { Id: '3', Name: 'Opening balance equity', AccountType: 'Equity' },
+  { Id: '4', Name: 'Direct supplies & materials', AccountType: 'Cost of Goods Sold' },
+  { Id: '5', Name: 'Advertising & marketing', AccountType: 'Expense' },
+  { Id: '6', Name: 'Vehicle gas & fuel', AccountType: 'Other Expense' },
+  { Id: '7', Name: 'Accounts payable', AccountType: 'Accounts payable (A/P)' },
+];
+
+describe('expenseAccountIds', () => {
+  it('keeps only spend-bearing account types', () => {
+    expect([...expenseAccountIds(chartOfAccounts)].sort()).toEqual(['4', '5', '6']);
+  });
+
+  it('ignores accounts with no id or type', () => {
+    expect(expenseAccountIds([{ Name: 'nameless' }, { Id: '9' }]).size).toBe(0);
+  });
+});
+
+describe('isSpendPurchase', () => {
+  const ids = expenseAccountIds(chartOfAccounts);
+
+  it('rejects the opening-balance entry QuickBooks writes on bank connect', () => {
+    const openingBalance: QboPurchase = {
+      Id: '1',
+      TotalAmt: 7199.58,
+      Line: [
+        {
+          Amount: 7199.58,
+          Description: 'Opening Balance from Bank',
+          AccountBasedExpenseLineDetail: { AccountRef: { value: '3', name: 'Opening balance equity' } },
+        },
+      ],
+    };
+    expect(isSpendPurchase(openingBalance, ids)).toBe(false);
+  });
+
+  it('accepts a purchase hitting a real expense account', () => {
+    expect(
+      isSpendPurchase(
+        { Id: '2', Line: [{ AccountBasedExpenseLineDetail: { AccountRef: { value: '4' } } }] },
+        ids,
+      ),
+    ).toBe(true);
+  });
+
+  it('accepts item purchases, which have no expense-account line', () => {
+    expect(
+      isSpendPurchase({ Id: '3', Line: [{ ItemBasedExpenseLineDetail: { ItemRef: { value: '11' } } }] }, ids),
+    ).toBe(true);
+  });
+
+  it('rejects a purchase with no lines at all', () => {
+    expect(isSpendPurchase({ Id: '4' }, ids)).toBe(false);
+  });
+
+  it('filters nothing when the chart of accounts could not be read', () => {
+    // Better to show one stray row than to silently drop every real expense.
+    expect(isSpendPurchase({ Id: '5' }, null)).toBe(true);
+  });
+});
 
 describe('mapAccountNameToCategory', () => {
   it('maps material-ish account names to materials', () => {

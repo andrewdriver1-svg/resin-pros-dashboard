@@ -27,6 +27,57 @@ export interface QboPurchaseLine {
   Description?: string;
   DetailType?: string;
   AccountBasedExpenseLineDetail?: { AccountRef?: QboRef };
+  /** Purchases of inventory/service items rather than a bare expense account. */
+  ItemBasedExpenseLineDetail?: { ItemRef?: QboRef };
+}
+
+/** An entry in the QuickBooks chart of accounts. */
+export interface QboAccount {
+  Id?: string;
+  Name?: string;
+  AccountType?: string;
+}
+
+/**
+ * QuickBooks account types that represent money actually spent.
+ *
+ * Everything else — Equity, Bank, Credit Card, Accounts Payable — shows up on
+ * Purchase records too. Opening balances are the case that bit us: connecting a
+ * bank account writes a Purchase against "Opening balance equity", which is a
+ * bookkeeping entry, not spend, and counting it inflated the dashboard by the
+ * full balance of every account.
+ */
+export const EXPENSE_ACCOUNT_TYPES = new Set([
+  'Expense',
+  'Other Expense',
+  'Cost of Goods Sold',
+]);
+
+/** Ids of every expense-type account, for filtering Purchases. */
+export function expenseAccountIds(accounts: QboAccount[]): Set<string> {
+  const ids = new Set<string>();
+  for (const a of accounts) {
+    if (a.Id && a.AccountType && EXPENSE_ACCOUNT_TYPES.has(a.AccountType)) ids.add(a.Id);
+  }
+  return ids;
+}
+
+/**
+ * Does this Purchase represent real spending?
+ *
+ * True when any line hits an expense account, or is an item purchase (items are
+ * always real purchases). A null account set means we couldn't read the chart of
+ * accounts — in that case nothing is filtered, because showing an extra row is
+ * recoverable and silently dropping every expense is not.
+ */
+export function isSpendPurchase(p: QboPurchase, accountIds: Set<string> | null): boolean {
+  if (!accountIds) return true;
+  const lines = Array.isArray(p.Line) ? p.Line : [];
+  return lines.some((l) => {
+    if (l.ItemBasedExpenseLineDetail) return true;
+    const id = l.AccountBasedExpenseLineDetail?.AccountRef?.value;
+    return typeof id === 'string' && accountIds.has(id);
+  });
 }
 
 export interface QboPurchase {
@@ -149,6 +200,8 @@ export function purchaseToTransaction(p: QboPurchase): SyncedTransaction | null 
 export interface QuickBooksSyncResult {
   purchases: number;
   upserted: number;
+  /** Purchases that weren't real spend (opening balances, transfers). */
+  skipped: number;
   errors: string[];
 }
 
@@ -161,7 +214,7 @@ const PAGE_SIZE = 200;
  * last FIRST_SYNC_DAYS on the first run) and upsert them by qbo_id.
  */
 export async function syncQuickBooks(): Promise<QuickBooksSyncResult> {
-  const result: QuickBooksSyncResult = { purchases: 0, upserted: 0, errors: [] };
+  const result: QuickBooksSyncResult = { purchases: 0, upserted: 0, skipped: 0, errors: [] };
 
   const client = await QuickBooksClient.fromStoredTokens();
   if (!client) {
@@ -179,6 +232,23 @@ export async function syncQuickBooks(): Promise<QuickBooksSyncResult> {
     new Date(Date.now() - FIRST_SYNC_DAYS * 24 * 60 * 60 * 1000).toISOString();
   const syncStartedAt = new Date().toISOString();
 
+  // Read the chart of accounts once so Purchases can be filtered to real spend.
+  // A failure here is non-fatal: we log it and sync unfiltered rather than
+  // dropping everything on the floor.
+  let accountIds: Set<string> | null = null;
+  try {
+    const accountPage = await client.query<{ Account?: QboAccount[] }>(
+      'select * from Account maxresults 1000',
+    );
+    accountIds = expenseAccountIds(Array.isArray(accountPage.Account) ? accountPage.Account : []);
+    if (accountIds.size === 0) {
+      console.warn('[quickbooks] no expense accounts found; syncing purchases unfiltered.');
+      accountIds = null;
+    }
+  } catch (err) {
+    console.warn(`[quickbooks] could not read chart of accounts: ${(err as Error).message}`);
+  }
+
   try {
     let startPosition = 1;
     for (;;) {
@@ -189,7 +259,10 @@ export async function syncQuickBooks(): Promise<QuickBooksSyncResult> {
       const purchases = Array.isArray(page.Purchase) ? page.Purchase : [];
       result.purchases += purchases.length;
 
-      const rows = purchases.map(purchaseToTransaction).filter((r): r is SyncedTransaction => r !== null);
+      const spend = purchases.filter((p) => isSpendPurchase(p, accountIds));
+      result.skipped += purchases.length - spend.length;
+
+      const rows = spend.map(purchaseToTransaction).filter((r): r is SyncedTransaction => r !== null);
       if (rows.length > 0) {
         const { error } = await admin.from('transactions').upsert(rows, { onConflict: 'qbo_id' });
         if (error) {
