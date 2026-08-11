@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { rollupJobCosts, rollupByCategory, spendingTotals, sumAmount, toSpendItems } from './spending';
+import { rollupByAccount, rollupJobCosts, rollupByCategory, spendingTotals, sumAmount, toSpendItems } from './spending';
 import type { Job, JobCost, Transaction } from './db/types';
 
 const jobs: Job[] = [
@@ -38,6 +38,45 @@ describe('toSpendItems', () => {
   it('preserves jobId only where one was set', () => {
     const items = toSpendItems([], transactions);
     expect(items.map((i) => i.jobId)).toEqual([undefined, undefined, 'j2']);
+  });
+});
+
+describe('rollupByAccount', () => {
+  it('lists every configured account even with no activity', () => {
+    const rows = rollupByAccount([]);
+    expect(rows.map((r) => r.accountId)).toEqual([
+      'operating-checking',
+      'business-card',
+      'mullineaux-card',
+    ]);
+    expect(rows.every((r) => r.total === 0 && r.count === 0)).toBe(true);
+  });
+
+  it('keeps the two credit cards separate', () => {
+    const rows = rollupByAccount([
+      { categoryId: 'materials', amount: 100, accountId: 'business-card' },
+      { categoryId: 'materials', amount: 250, accountId: 'mullineaux-card' },
+      { categoryId: 'insurance', amount: 40, accountId: 'operating-checking' },
+    ]);
+    expect(rows.find((r) => r.accountId === 'business-card')!.total).toBe(100);
+    expect(rows.find((r) => r.accountId === 'mullineaux-card')!.total).toBe(250);
+    expect(rows.find((r) => r.accountId === 'operating-checking')!.total).toBe(40);
+  });
+
+  it('surfaces unmatched spend instead of dropping it', () => {
+    const rows = rollupByAccount([
+      { categoryId: 'materials', amount: 100, accountId: 'business-card' },
+      { categoryId: 'materials', amount: 75 },
+    ]);
+    const unassigned = rows.find((r) => r.accountId === null)!;
+    expect(unassigned.total).toBe(75);
+    // Per-account totals must reconcile with the headline total.
+    expect(rows.reduce((sum, r) => sum + r.total, 0)).toBe(175);
+  });
+
+  it('omits the unassigned row when everything matched', () => {
+    const rows = rollupByAccount([{ categoryId: 'materials', amount: 10, accountId: 'business-card' }]);
+    expect(rows.some((r) => r.accountId === null)).toBe(false);
   });
 });
 

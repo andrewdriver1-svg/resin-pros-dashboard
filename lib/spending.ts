@@ -21,14 +21,61 @@ export interface SpendItem {
   categoryId: string;
   amount: number;
   jobId?: string;
+  accountId?: string;
 }
 
 /** Merge both spend sources into one list for the rollups below. */
 export function toSpendItems(costs: JobCost[], transactions: Transaction[] = []): SpendItem[] {
   return [
-    ...costs.map((c) => ({ categoryId: c.categoryId, amount: c.amount, jobId: c.jobId })),
-    ...transactions.map((t) => ({ categoryId: t.categoryId, amount: t.amount, jobId: t.jobId })),
+    ...costs.map((c) => ({ categoryId: c.categoryId, amount: c.amount, jobId: c.jobId, accountId: c.accountId })),
+    ...transactions.map((t) => ({ categoryId: t.categoryId, amount: t.amount, jobId: t.jobId, accountId: t.accountId })),
   ];
+}
+
+export interface AccountRollup {
+  accountId: string | null;
+  label: string;
+  /** Last 4 digits, when known. */
+  last4?: string;
+  type: 'checking' | 'credit_card' | 'savings' | 'unassigned';
+  total: number;
+  count: number;
+}
+
+/**
+ * Total spend per financial account, in configured order.
+ *
+ * Every configured account is returned even at zero, so the owner can see all
+ * three accounts rather than only the ones that happen to have activity. Spend
+ * that couldn't be matched to an account is grouped into a trailing
+ * "Unassigned" row instead of being hidden — a silent drop here would make the
+ * per-account totals quietly disagree with the headline total.
+ */
+export function rollupByAccount(items: SpendItem[]): AccountRollup[] {
+  const rows: AccountRollup[] = businessConfig.accounts.map((a) => ({
+    accountId: a.id,
+    label: a.label,
+    last4: a.last4,
+    type: a.type,
+    total: 0,
+    count: 0,
+  }));
+  const unassigned: AccountRollup = {
+    accountId: null,
+    label: 'Unassigned',
+    type: 'unassigned',
+    total: 0,
+    count: 0,
+  };
+
+  for (const item of items) {
+    const amount = Number.isFinite(item.amount) ? item.amount : 0;
+    const row = rows.find((r) => r.accountId === item.accountId) ?? unassigned;
+    row.total += amount;
+    row.count += 1;
+  }
+
+  return unassigned.count > 0 ? [...rows, unassigned] : rows;
 }
 
 export interface JobCostRollup {
