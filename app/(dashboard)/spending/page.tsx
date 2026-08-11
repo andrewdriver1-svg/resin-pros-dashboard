@@ -2,7 +2,7 @@ import Link from 'next/link';
 import { Suspense } from 'react';
 import { getCategory } from '@/config/business.config';
 import { getJobCosts, getJobs, getTransactions } from '@/lib/db';
-import { rollupByCategory, rollupJobCosts, spendingTotals, toSpendItems } from '@/lib/spending';
+import { rollupByAccount, rollupByCategory, rollupJobCosts, spendingTotals, toSpendItems } from '@/lib/spending';
 import { formatMoney, formatDate } from '@/app/components/format';
 import { PageHeader, Card, StatGrid, StatTile, TableWrap } from '@/app/components/ui';
 import { EmptyState, StatGridSkeleton, TableSkeleton } from '@/app/components/states';
@@ -26,6 +26,10 @@ export default function SpendingPage() {
         </p>
         <CsvImportForm />
       </Card>
+
+      <Suspense fallback={<TableSkeleton rows={3} />}>
+        <ByAccount />
+      </Suspense>
 
       <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
         <Suspense fallback={<TableSkeleton />}>
@@ -57,6 +61,48 @@ async function Totals() {
       <StatTile label="Direct job cost" value={formatMoney(jobCostTotal)} hint="Materials, labor, rentals" />
       <StatTile label="Overhead" value={formatMoney(overheadTotal)} hint="Software, insurance, admin" />
     </StatGrid>
+  );
+}
+
+const ACCOUNT_TYPE_LABEL: Record<string, string> = {
+  checking: 'Checking',
+  credit_card: 'Credit card',
+  savings: 'Savings',
+  unassigned: 'Not matched to an account',
+};
+
+async function ByAccount() {
+  const rows = rollupByAccount(await loadSpend());
+  return (
+    <Card title="By account">
+      <TableWrap>
+        <table className="min-w-full text-sm">
+          <thead>
+            <tr className="border-b border-slate-100 text-left text-xs uppercase tracking-wide text-slate-500">
+              <th className="px-3 py-2 font-medium">Account</th>
+              <th className="px-3 py-2 font-medium">Type</th>
+              <th className="px-3 py-2 text-right font-medium">Transactions</th>
+              <th className="px-3 py-2 text-right font-medium">Spend</th>
+            </tr>
+          </thead>
+          <tbody className="divide-y divide-slate-100">
+            {rows.map((r) => (
+              <tr key={r.accountId ?? 'unassigned'}>
+                <td className="px-3 py-2.5 font-medium text-slate-900">
+                  {r.label}
+                  {r.last4 && <span className="ml-1.5 text-xs font-normal text-slate-400">••{r.last4}</span>}
+                </td>
+                <td className="px-3 py-2.5 text-slate-600">{ACCOUNT_TYPE_LABEL[r.type] ?? r.type}</td>
+                <td className="whitespace-nowrap px-3 py-2.5 text-right text-slate-600">{r.count}</td>
+                <td className="whitespace-nowrap px-3 py-2.5 text-right font-medium text-slate-900">
+                  {formatMoney(r.total)}
+                </td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </TableWrap>
+    </Card>
   );
 }
 
