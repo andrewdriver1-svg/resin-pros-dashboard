@@ -2,7 +2,7 @@ import Link from 'next/link';
 import { Suspense } from 'react';
 import { getCategory } from '@/config/business.config';
 import { getJobCosts, getJobs, getTransactions } from '@/lib/db';
-import { rollupByCategory, rollupJobCosts, spendingTotals } from '@/lib/spending';
+import { rollupByCategory, rollupJobCosts, spendingTotals, toSpendItems } from '@/lib/spending';
 import { formatMoney, formatDate } from '@/app/components/format';
 import { PageHeader, Card, StatGrid, StatTile, TableWrap } from '@/app/components/ui';
 import { EmptyState, StatGridSkeleton, TableSkeleton } from '@/app/components/states';
@@ -43,9 +43,14 @@ export default function SpendingPage() {
   );
 }
 
+/** Every spend source the rollups should see: job costs + imported/synced transactions. */
+async function loadSpend() {
+  const [costs, txns] = await Promise.all([getJobCosts(), getTransactions()]);
+  return toSpendItems(costs, txns);
+}
+
 async function Totals() {
-  const costs = await getJobCosts();
-  const { total, jobCostTotal, overheadTotal } = spendingTotals(costs);
+  const { total, jobCostTotal, overheadTotal } = spendingTotals(await loadSpend());
   return (
     <StatGrid>
       <StatTile label="Total tracked spend" value={formatMoney(total)} />
@@ -56,12 +61,11 @@ async function Totals() {
 }
 
 async function ByCategory() {
-  const costs = await getJobCosts();
-  const rows = rollupByCategory(costs);
+  const rows = rollupByCategory(await loadSpend());
   return (
     <Card title="By category">
       {rows.length === 0 ? (
-        <EmptyState title="No spend yet" message="Import a statement or attribute costs to jobs to see this break down." />
+        <EmptyState title="No spend yet" message="Sync QuickBooks, import a statement, or attribute costs to jobs to see this break down." />
       ) : (
         <ul className="divide-y divide-slate-100">
           {rows.map((r) => (
@@ -80,8 +84,8 @@ async function ByCategory() {
 }
 
 async function ByJob() {
-  const [jobs, costs] = await Promise.all([getJobs(), getJobCosts()]);
-  const rollups = rollupJobCosts(jobs, costs)
+  const [jobs, spend] = await Promise.all([getJobs(), loadSpend()]);
+  const rollups = rollupJobCosts(jobs, spend)
     .filter((r) => r.costCount > 0)
     .sort((a, b) => b.totalCost - a.totalCost);
 
