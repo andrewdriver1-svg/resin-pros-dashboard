@@ -20,6 +20,15 @@ export interface FinancialAccount {
   /** Last 4 digits, for disambiguating statements. Optional. */
   last4?: string;
   type: 'checking' | 'credit_card' | 'savings';
+  /**
+   * Exact QuickBooks account names that map to this account, lowercased.
+   *
+   * Matching on real names rather than keywords matters: QuickBooks types all
+   * of these as "Bank" (not "Credit Card"), and names like "BUS COMPLETE CHK"
+   * or "R. MULLINEAUX" contain no word a heuristic would recognise. Anything
+   * unmatched is left unassigned rather than guessed at.
+   */
+  qboNames?: string[];
 }
 
 export interface SpendingCategory {
@@ -79,18 +88,31 @@ export const businessConfig: BusinessConfig = {
 
   // Accounts spending is reconciled against. Ids are referenced by imported
   // transactions; keep them stable once real statements start flowing in.
+  // Mirrors the QuickBooks chart of accounts for Resin Pros Flooring.
   accounts: [
     {
       id: 'operating-checking',
-      label: 'Operating Checking',
+      label: 'BUS COMPLETE CHK',
       institution: 'Business Bank', // TODO(andrew)
+      last4: '5039',
       type: 'checking',
+      qboNames: ['bus complete chk (5039)', 'bus complete chk'],
     },
     {
       id: 'business-card',
-      label: 'Business Card',
-      institution: 'Business Bank', // TODO(andrew)
+      label: 'Blue Business Plus Card',
+      institution: 'American Express', // TODO(andrew): confirm issuer
+      last4: '1002',
       type: 'credit_card',
+      qboNames: ['blue business plus card (1002)', 'blue business plus card'],
+    },
+    {
+      id: 'mullineaux-card',
+      label: 'R. MULLINEAUX',
+      institution: 'Business Bank', // TODO(andrew): confirm issuer
+      last4: '9898',
+      type: 'credit_card',
+      qboNames: ['r. mullineaux (9898)', 'r. mullineaux'],
     },
   ],
 
