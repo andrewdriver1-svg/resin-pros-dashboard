@@ -28,13 +28,23 @@ describe('mapAccountNameToCategory', () => {
 });
 
 describe('mapPaymentAccount', () => {
-  it('maps card-like names to the configured credit card account', () => {
-    expect(mapPaymentAccount('Visa Business Card')).toBe('business-card');
-    expect(mapPaymentAccount('Chase Credit Card')).toBe('business-card');
+  it('matches the real QuickBooks account names exactly', () => {
+    expect(mapPaymentAccount('BUS COMPLETE CHK (5039)')).toBe('operating-checking');
+    expect(mapPaymentAccount('Blue Business Plus Card (1002)')).toBe('business-card');
+    expect(mapPaymentAccount('R. MULLINEAUX (9898)')).toBe('mullineaux-card');
   });
 
-  it('maps bank-like names to the configured checking account', () => {
-    expect(mapPaymentAccount('Operating Checking')).toBe('operating-checking');
+  it('is case- and whitespace-insensitive', () => {
+    expect(mapPaymentAccount('  r. mullineaux (9898)  ')).toBe('mullineaux-card');
+  });
+
+  it('never guesses between the two credit cards', () => {
+    // Card-like but not a configured name: two cards exist, so guessing would
+    // put spend on the wrong one. Leave it unassigned instead.
+    expect(mapPaymentAccount('Some Other Visa Card')).toBeNull();
+  });
+
+  it('still falls back for checking, where only one account exists', () => {
     expect(mapPaymentAccount('Business Bank Account')).toBe('operating-checking');
   });
 
@@ -50,7 +60,7 @@ describe('purchaseToTransaction', () => {
     TxnDate: '2026-08-01',
     TotalAmt: 812.4,
     PaymentType: 'CreditCard',
-    AccountRef: { value: '42', name: 'Business Credit Card' },
+    AccountRef: { value: '42', name: 'Blue Business Plus Card (1002)' },
     EntityRef: { value: '7', name: 'Sherwin-Williams' },
     Line: [
       {

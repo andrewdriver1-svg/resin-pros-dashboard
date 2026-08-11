@@ -90,18 +90,29 @@ export function mapAccountNameToCategory(accountName: string | undefined): strin
 }
 
 /**
- * Map the QBO payment account (bank/cc the money left) to one of the
- * configured financial accounts, by loose name match. Pure + exported for tests.
+ * Map the QBO payment account (the bank/card the money left) to one of the
+ * configured financial accounts. Pure + exported for tests.
+ *
+ * Exact names from `qboNames` win, because that's the only way to tell two
+ * credit cards apart — a keyword match would collapse both onto whichever card
+ * happened to be listed first. The keyword pass is a fallback for accounts that
+ * haven't been added to the config yet.
  */
 export function mapPaymentAccount(accountName: string | undefined): string | null {
   if (!accountName) return null;
-  const n = accountName.toLowerCase();
-  if (/credit|card|visa|master|amex/.test(n)) {
-    return businessConfig.accounts.find((a) => a.type === 'credit_card')?.id ?? null;
-  }
-  if (/check|bank|operating|cash/.test(n)) {
-    return businessConfig.accounts.find((a) => a.type === 'checking')?.id ?? null;
-  }
+  const n = accountName.trim().toLowerCase();
+
+  const exact = businessConfig.accounts.find((a) => a.qboNames?.some((name) => name.toLowerCase() === n));
+  if (exact) return exact.id;
+
+  // Fallback: only safe when there is exactly one account of that type, so an
+  // unrecognised card is never silently attributed to the wrong one.
+  const onlyOfType = (type: 'checking' | 'credit_card') => {
+    const matches = businessConfig.accounts.filter((a) => a.type === type);
+    return matches.length === 1 ? matches[0].id : null;
+  };
+  if (/credit|card|visa|master|amex/.test(n)) return onlyOfType('credit_card');
+  if (/check|chk|bank|operating|cash/.test(n)) return onlyOfType('checking');
   return null;
 }
 
