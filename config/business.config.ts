@@ -75,10 +75,11 @@ export const businessConfig: BusinessConfig = {
   tagline: 'Commercial & industrial resin flooring and polished concrete',
 
   contact: {
-    phone: '(000) 000-0000', // TODO(andrew): confirm business line
-    email: 'office@resinprosflooring.com', // TODO(andrew): confirm
-    address: '', // TODO(andrew): confirm mailing address
-    timezone: 'America/New_York', // TODO(andrew): confirm operating timezone
+    // Verified against the Google Business Profile and resinprosflooringllc.com.
+    phone: '(302) 440-3109',
+    email: 'andrew@resinprosflooringllc.com',
+    address: 'Newtown Square, PA 19073',
+    timezone: 'America/New_York',
   },
 
   owners: [
