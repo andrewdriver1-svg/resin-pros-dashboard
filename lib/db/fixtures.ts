@@ -115,13 +115,17 @@ export const fixtureTransactions: Transaction[] = [
   { id: 'txn-5', date: '2026-07-05', description: 'ADOBE + QUICKBOOKS', amount: 118.99, categoryId: 'software', accountId: 'business-card', source: 'csv_import' },
 ];
 
+// Real figures, read from the live Google Business Profile, Instagram and
+// Facebook on 2026-08-11. This is the fallback shown before anyone saves a
+// snapshot on the Settings page; keep it truthful rather than illustrative,
+// because it renders on Marketing and the Overview exactly like saved data.
 export const fixtureGoogleBusiness: GoogleBusinessSnapshot = {
-  rating: 4.9,
-  reviewCount: 63,
-  phone: '(585) 555-0100',
-  hours: 'Mon–Fri 7:00 AM – 5:00 PM',
+  rating: 5.0,
+  reviewCount: 13,
+  phone: '(302) 440-3109',
+  hours: 'Mon–Sat 7:00 AM – 7:00 PM · Sun closed',
   profileStrengthOk: true,
-  facebookFollowers: 512,
-  instagramFollowers: 1180,
-  updatedAt: '2026-07-01T15:00:00.000Z',
+  facebookFollowers: 3800, // Facebook only publishes a rounded "3.8K".
+  instagramFollowers: 13513,
+  updatedAt: '2026-08-11T00:00:00.000Z',
 };
