@@ -17,8 +17,15 @@ export async function GET(request: NextRequest) {
   const secret = process.env.CRON_SECRET ?? '';
   const auth = request.headers.get('authorization');
 
-  // If a secret is configured, require it. (Vercel Cron sends it automatically.)
-  if (secret && auth !== `Bearer ${secret}`) {
+  // Fail CLOSED. An unset secret must refuse to run, not run open to the
+  // internet — this endpoint triggers full Jobber + QuickBooks syncs, so an
+  // unauthenticated caller could burn both APIs' rate limits at will. The
+  // /api paths are excluded from the login gate on the assumption each route
+  // authenticates itself; this one has to actually do it.
+  if (!secret) {
+    return NextResponse.json({ ok: false, error: 'CRON_SECRET is not configured.' }, { status: 503 });
+  }
+  if (auth !== `Bearer ${secret}`) {
     return NextResponse.json({ ok: false, error: 'Unauthorized.' }, { status: 401 });
   }
 
