@@ -19,6 +19,9 @@ import { createSupabaseAdminClient } from '@/lib/supabase/admin';
 
 const CLIENT_ID = process.env.QUICKBOOKS_CLIENT_ID ?? '';
 const CLIENT_SECRET = process.env.QUICKBOOKS_CLIENT_SECRET ?? '';
+
+/** Hard cap on any Intuit round-trip — a hung upstream must not pin a function. */
+const FETCH_TIMEOUT_MS = 25_000;
 /** 'production' (default) or 'sandbox' — selects the API base URL. */
 const QBO_ENV = process.env.QUICKBOOKS_ENV === 'sandbox' ? 'sandbox' : 'production';
 const APP_URL = process.env.APP_URL ?? 'http://localhost:3000';
@@ -88,6 +91,7 @@ async function requestToken(
       Accept: 'application/json',
     },
     body: new URLSearchParams(body).toString(),
+    signal: AbortSignal.timeout(FETCH_TIMEOUT_MS),
   });
   const json = (await res.json().catch(() => ({}))) as RawTokenResponse;
   if (!res.ok || !json.access_token || !json.refresh_token) {
@@ -165,6 +169,7 @@ export async function revokeQuickBooksToken(refreshToken: string): Promise<void>
       Accept: 'application/json',
     },
     body: JSON.stringify({ token: refreshToken }),
+    signal: AbortSignal.timeout(FETCH_TIMEOUT_MS),
   });
   if (!res.ok) {
     throw new Error(`QuickBooks revoke failed (${res.status}): ${await res.text().catch(() => '')}`);
@@ -232,6 +237,7 @@ export class QuickBooksClient {
         Authorization: `Bearer ${this.tokens.accessToken}`,
         Accept: 'application/json',
       },
+      signal: AbortSignal.timeout(FETCH_TIMEOUT_MS),
     });
     if (!res.ok) {
       throw new Error(`QuickBooks query HTTP ${res.status}: ${await res.text().catch(() => '')}`);
