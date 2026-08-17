@@ -50,6 +50,15 @@ const bool = (v: unknown, fallback = false): boolean => (typeof v === 'boolean' 
  * Generic list read with fixture fallback. `table` + `map` describe the Supabase
  * source; `fixture` is the fallback. Any failure returns the fixture.
  */
+/**
+ * PostgREST silently truncates unlimited selects at its `db-max-rows` cap
+ * (1000 by default) — a truncated 200, not an error. Ask for more explicitly
+ * so a year of transactions doesn't quietly start dropping its oldest rows
+ * from every total. 10k is far above current volume; revisit with pagination
+ * if any table approaches it.
+ */
+const MAX_ROWS = 10_000;
+
 async function readList<T>(opts: {
   table: string;
   map: (row: Row) => T;
@@ -59,7 +68,7 @@ async function readList<T>(opts: {
   if (!isSupabaseConfigured()) return opts.fixture;
   try {
     const supabase = await createSupabaseServerClient();
-    let query = supabase.from(opts.table).select('*');
+    let query = supabase.from(opts.table).select('*').limit(MAX_ROWS);
     if (opts.order) query = query.order(opts.order.column, { ascending: opts.order.ascending });
     const { data, error } = await query;
     if (error) {
@@ -193,20 +202,24 @@ export function getLeads(): Promise<Lead[]> {
   return readList({ table: 'leads', map: rowToLead, fixture: fixtureLeads, order: { column: 'received_at', ascending: false } });
 }
 
+// Explicit sort orders below: without one, Postgres returns heap order, which
+// shifts as rows are updated — tables would reshuffle between page loads.
 export function getQuotes(): Promise<Quote[]> {
-  return readList({ table: 'quotes', map: rowToQuote, fixture: fixtureQuotes });
+  return readList({ table: 'quotes', map: rowToQuote, fixture: fixtureQuotes, order: { column: 'issued_at', ascending: false } });
 }
 
 export function getInvoices(): Promise<Invoice[]> {
-  return readList({ table: 'invoices', map: rowToInvoice, fixture: fixtureInvoices });
+  // Oldest unpaid first is the AR question; issued_at ascending approximates
+  // aging until the UI grows real sorting.
+  return readList({ table: 'invoices', map: rowToInvoice, fixture: fixtureInvoices, order: { column: 'issued_at', ascending: true } });
 }
 
 export function getJobCosts(): Promise<JobCost[]> {
-  return readList({ table: 'job_costs', map: rowToJobCost, fixture: fixtureJobCosts });
+  return readList({ table: 'job_costs', map: rowToJobCost, fixture: fixtureJobCosts, order: { column: 'date', ascending: false } });
 }
 
 export function getTodos(): Promise<MaterialTodo[]> {
-  return readList({ table: 'material_todos', map: rowToTodo, fixture: fixtureTodos });
+  return readList({ table: 'material_todos', map: rowToTodo, fixture: fixtureTodos, order: { column: 'needed_by', ascending: true } });
 }
 
 export function getMarketing(): Promise<MarketingEntry[]> {
