@@ -5,6 +5,7 @@ import { formatMoney, formatDate } from '@/app/components/format';
 import { PageHeader, Card, StatGrid, StatTile, TableWrap } from '@/app/components/ui';
 import { EmptyState, StatGridSkeleton, TableSkeleton } from '@/app/components/states';
 import { getBidShortlist, getRevenueHeatmap, guerrillaConfigured } from '@/lib/guerrilla/client';
+import { PastJobForm } from '@/app/components/PastJobForm';
 
 export const dynamic = 'force-dynamic';
 
@@ -27,6 +28,15 @@ export default function MarketingPage() {
       <Suspense fallback={<TableSkeleton rows={5} />}>
         <RevenueNeighborhoods />
       </Suspense>
+      {guerrillaConfigured() && (
+        <Card title="Add a past job (cash / pre-Jobber)">
+          <p className="mb-3 text-sm text-slate-500">
+            Old jobs that never made it into a system still count for neighborhood targeting.
+            Address and rough value are enough.
+          </p>
+          <PastJobForm />
+        </Card>
+      )}
     </div>
   );
 }
