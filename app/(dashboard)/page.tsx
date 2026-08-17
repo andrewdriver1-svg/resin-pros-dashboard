@@ -1,7 +1,7 @@
 import Link from 'next/link';
 import { Suspense } from 'react';
 import { getInvoices, getJobs, getLeads } from '@/lib/db';
-import { formatMoney, formatDate, relativeTime } from '@/app/components/format';
+import { formatMoney, formatDateTime, relativeTime } from '@/app/components/format';
 import { PageHeader, StatGrid, StatTile, Card, StatusBadge } from '@/app/components/ui';
 import { EmptyState, StatGridSkeleton, TableSkeleton } from '@/app/components/states';
 
@@ -10,7 +10,7 @@ export const dynamic = 'force-dynamic';
 export default function OverviewPage() {
   return (
     <div className="space-y-6">
-      <PageHeader title="Overview" description="Where things stand this morning." />
+      <PageHeader title="Overview" description="Where things stand right now." />
       <Suspense fallback={<StatGridSkeleton />}>
         <Stats />
       </Suspense>
@@ -30,7 +30,13 @@ async function Stats() {
   const [jobs, leads, invoices] = await Promise.all([getJobs(), getLeads(), getInvoices()]);
   const active = jobs.filter((j) => j.status === 'in_progress' || j.status === 'scheduled');
   const newLeads = leads.filter((l) => l.status === 'new').length;
-  const outstanding = invoices.reduce((sum, i) => sum + Math.max(0, i.amount - i.amountPaid), 0);
+  // AR = balances someone actually owes. Drafts were never sent, bad debt is
+  // written off, and 'unknown' means the status mapping drifted — counting any
+  // of those overstates receivables and sends the owner chasing money that
+  // either isn't due yet or is already gone.
+  const outstanding = invoices
+    .filter((i) => i.status !== 'draft' && i.status !== 'bad_debt' && i.status !== 'unknown')
+    .reduce((sum, i) => sum + Math.max(0, i.amount - i.amountPaid), 0);
   const pipeline = active.reduce((sum, j) => sum + j.value, 0);
 
   return (
@@ -50,8 +56,18 @@ async function Stats() {
 
 async function TodaySchedule() {
   const jobs = await getJobs();
+  // Ascending sort + slice means the OLDEST entries win the card. Without a
+  // date floor, a job someone forgot to close out in March sits at the top of
+  // this list forever and pushes this week's work off it. Jobs still open from
+  // before yesterday are a bookkeeping problem, not a schedule.
+  const cutoff = Date.now() - 24 * 60 * 60 * 1000;
   const upcoming = jobs
-    .filter((j) => j.scheduledAt && (j.status === 'scheduled' || j.status === 'in_progress'))
+    .filter(
+      (j) =>
+        j.scheduledAt &&
+        (j.status === 'scheduled' || j.status === 'in_progress') &&
+        new Date(j.scheduledAt).getTime() >= cutoff,
+    )
     .sort((a, b) => (a.scheduledAt! < b.scheduledAt! ? -1 : 1))
     .slice(0, 6);
 
@@ -68,7 +84,7 @@ async function TodaySchedule() {
                   {job.title}
                 </Link>
                 <div className="truncate text-xs text-slate-500">
-                  {job.clientName} · {formatDate(job.scheduledAt)}
+                  {job.clientName} · {formatDateTime(job.scheduledAt)}
                 </div>
               </div>
               <StatusBadge status={job.status} />
