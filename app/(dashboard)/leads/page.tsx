@@ -47,8 +47,24 @@ async function LeadsTable() {
               <tr key={lead.id} className="align-top">
                 <td className="px-3 py-3">
                   <div className="font-medium text-slate-900">{lead.clientName}</div>
-                  <div className="text-xs text-slate-500">
-                    {lead.contactEmail ?? lead.contactPhone ?? 'No contact info'}
+                  {/* Calling a fresh lead back fast is the whole game — these
+                      must be one-tap dial/email on a phone, and when a lead has
+                      both, show both (the old `??` chain hid the phone number
+                      whenever an email existed). */}
+                  <div className="flex flex-wrap gap-x-3 text-xs">
+                    {lead.contactPhone && (
+                      <a href={`tel:${lead.contactPhone.replace(/[^+\d]/g, '')}`} className="text-sky-700 hover:underline">
+                        {lead.contactPhone}
+                      </a>
+                    )}
+                    {lead.contactEmail && (
+                      <a href={`mailto:${lead.contactEmail}`} className="text-sky-700 hover:underline">
+                        {lead.contactEmail}
+                      </a>
+                    )}
+                    {!lead.contactPhone && !lead.contactEmail && (
+                      <span className="text-slate-500">No contact info</span>
+                    )}
                   </div>
                 </td>
                 <td className="max-w-xs px-3 py-3 text-slate-600">{lead.summary}</td>
