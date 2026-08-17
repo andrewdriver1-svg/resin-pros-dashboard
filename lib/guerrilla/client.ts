@@ -57,3 +57,18 @@ export function getRevenueHeatmap() {
 export function getBidShortlist() {
   return fetchMachine<BidShortlist>("/api/bids/shortlist");
 }
+
+export type ScorecardChannel = {
+  channel: string;
+  leads: number;
+  won: number;
+  revenueCents: number;
+  spendCents: number;
+  cplCents: number | null;
+  cpbjCents: number | null;
+  closeRate: number | null;
+};
+
+export function getScorecard() {
+  return fetchMachine<{ from: string; to: string; channels: ScorecardChannel[] }>("/api/scorecard");
+}

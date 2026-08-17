@@ -4,7 +4,7 @@ import { getGoogleBusinessSnapshot } from '@/lib/db';
 import { formatMoney, formatDate } from '@/app/components/format';
 import { PageHeader, Card, StatGrid, StatTile, TableWrap } from '@/app/components/ui';
 import { EmptyState, StatGridSkeleton, TableSkeleton } from '@/app/components/states';
-import { getBidShortlist, getRevenueHeatmap, guerrillaConfigured } from '@/lib/guerrilla/client';
+import { getBidShortlist, getRevenueHeatmap, getScorecard, guerrillaConfigured } from '@/lib/guerrilla/client';
 import { PastJobForm } from '@/app/components/PastJobForm';
 
 export const dynamic = 'force-dynamic';
@@ -21,6 +21,9 @@ export default function MarketingPage() {
       </Suspense>
       <Suspense fallback={<TableSkeleton rows={5} />}>
         <ChannelTable />
+      </Suspense>
+      <Suspense fallback={<TableSkeleton rows={5} />}>
+        <Scorecard />
       </Suspense>
       <Suspense fallback={<TableSkeleton rows={5} />}>
         <BidRadar />
@@ -180,6 +183,47 @@ async function RevenueNeighborhoods() {
                 <td className="whitespace-nowrap px-3 py-2 font-mono text-xs">{n.blockGroup}</td>
                 <td className="px-3 py-2">{n.jobCount}</td>
                 <td className="px-3 py-2">{formatMoney(n.revenueCents / 100)}</td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </TableWrap>
+    </Card>
+  );
+}
+
+
+async function Scorecard() {
+  if (!guerrillaConfigured()) return null;
+  const data = await getScorecard();
+  if (!data || data.channels.length === 0) return null;
+  return (
+    <Card title={`Cost per booked job — last 90 days`}>
+      <TableWrap>
+        <table className="min-w-full text-sm">
+          <thead>
+            <tr className="border-b border-slate-100 text-left text-xs uppercase tracking-wide text-slate-500">
+              <th className="px-3 py-2 font-medium">Channel</th>
+              <th className="px-3 py-2 font-medium">Leads</th>
+              <th className="px-3 py-2 font-medium">Booked</th>
+              <th className="px-3 py-2 font-medium">Close</th>
+              <th className="px-3 py-2 font-medium">Revenue</th>
+              <th className="px-3 py-2 font-medium">Spend</th>
+              <th className="px-3 py-2 font-medium">CPL</th>
+              <th className="px-3 py-2 font-medium">CPBJ</th>
+            </tr>
+          </thead>
+          <tbody>
+            {data.channels.map((c) => (
+              <tr key={c.channel} className="border-b border-slate-50">
+                <td className="px-3 py-2 font-medium">{c.channel}</td>
+                <td className="px-3 py-2">{c.leads}</td>
+                <td className="px-3 py-2">{c.won}</td>
+                <td className="px-3 py-2">{c.closeRate != null ? `${Math.round(c.closeRate * 100)}%` : '—'}</td>
+                <td className="px-3 py-2">{formatMoney(c.revenueCents / 100)}</td>
+                <td className="px-3 py-2">{formatMoney(c.spendCents / 100)}</td>
+                <td className="px-3 py-2">{c.cplCents != null && c.spendCents > 0 ? formatMoney(c.cplCents / 100) : '—'}</td>
+                <td className="px-3 py-2">{c.cpbjCents != null && c.spendCents > 0 ? formatMoney(c.cpbjCents / 100) : '—'}</td>
               </tr>
             ))}
           </tbody>
