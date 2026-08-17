@@ -168,8 +168,16 @@ export function mapJobberInvoice(node: JobberInvoiceNode): Invoice | null {
     return null;
   }
   const amount = typeof node.amounts?.total === 'number' ? node.amounts.total : 0;
-    const balance = typeof node.amounts?.invoiceBalance === 'number' ? node.amounts.invoiceBalance : 0;
-    const amountPaid = Math.max(0, amount - balance);
+  // A missing balance must NOT default to 0 — zero balance means "fully paid",
+  // so that fallback would mark every affected invoice paid and drive
+  // Outstanding AR to $0, which reads as good news while receivables rot.
+  // Default to the full amount owed (amountPaid 0) and log it, so a schema
+  // drift shows up as too-much-AR (which gets investigated) rather than
+  // none (which gets celebrated).
+  const hasBalance = typeof node.amounts?.invoiceBalance === 'number';
+  if (!hasBalance) warnMissing('amounts.invoiceBalance', node.id, 'invoice');
+  const balance = hasBalance ? node.amounts!.invoiceBalance! : amount;
+  const amountPaid = Math.max(0, amount - balance);
   return {
     id: node.id,
     jobberId: node.id,

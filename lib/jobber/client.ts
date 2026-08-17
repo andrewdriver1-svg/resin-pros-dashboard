@@ -53,11 +53,19 @@ interface RawTokenResponse {
   error_description?: string;
 }
 
+/**
+ * Every outbound call gets a hard timeout. A hung upstream otherwise pins a
+ * serverless function until the platform kills it — and on the webhook path
+ * Jobber then RETRIES, stacking more hung invocations behind the first.
+ */
+const FETCH_TIMEOUT_MS = 25_000;
+
 async function requestToken(body: Record<string, string>): Promise<JobberTokens> {
   const res = await fetch(JOBBER_TOKEN_URL, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json', Accept: 'application/json' },
     body: JSON.stringify(body),
+    signal: AbortSignal.timeout(FETCH_TIMEOUT_MS),
   });
   const json = (await res.json().catch(() => ({}))) as RawTokenResponse;
   if (!res.ok || !json.access_token || !json.refresh_token) {
@@ -164,6 +172,7 @@ export class JobberClient {
         'X-JOBBER-GRAPHQL-VERSION': API_VERSION,
       },
       body: JSON.stringify({ query, variables: variables ?? {} }),
+      signal: AbortSignal.timeout(FETCH_TIMEOUT_MS),
     });
     if (!res.ok) {
       throw new Error(`Jobber GraphQL HTTP ${res.status}: ${await res.text().catch(() => '')}`);
