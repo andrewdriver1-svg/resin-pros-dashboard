@@ -10,10 +10,54 @@ import { GoogleBusinessForm } from '@/app/components/GoogleBusinessForm';
 
 export const dynamic = 'force-dynamic';
 
-export default function SettingsPage() {
+/**
+ * Human-readable outcomes for the `?jobber=` / `?quickbooks=` query params the
+ * OAuth callback routes redirect back with. Without this, every outcome —
+ * including "you denied access" and "session expired, try again" — landed on a
+ * silent, unchanged page, and the only rational user response was to keep
+ * re-tapping Connect.
+ */
+const OAUTH_MESSAGES: Record<string, { text: string; ok: boolean }> = {
+  connected: { text: 'Connected. Data will appear after the next sync.', ok: true },
+  disconnected: { text: 'Disconnected, and access was revoked.', ok: true },
+  'disconnected-local': {
+    text: 'Disconnected here, but revoking access upstream failed — you can also remove the app from the provider’s connected-apps page.',
+    ok: false,
+  },
+  denied: { text: 'Authorization was declined, so nothing was connected.', ok: false },
+  badstate: { text: 'The sign-in session expired before finishing. Try Connect again in one go.', ok: false },
+  norealm: { text: 'The provider didn’t say which company was authorized. Try Connect again.', ok: false },
+  error: { text: 'Connection failed partway through. Try again; if it keeps failing, check the server logs.', ok: false },
+  unconfigured: { text: 'OAuth credentials aren’t set on the server, so connecting is disabled.', ok: false },
+};
+
+function OAuthNotice({ provider, code }: { provider: string; code: string | undefined }) {
+  if (!code) return null;
+  const m = OAUTH_MESSAGES[code] ?? { text: `Unexpected status “${code}”.`, ok: false };
+  return (
+    <div
+      role="status"
+      className={`rounded-lg border p-3 text-sm ${
+        m.ok ? 'border-emerald-200 bg-emerald-50 text-emerald-800' : 'border-amber-200 bg-amber-50 text-amber-800'
+      }`}
+    >
+      <span className="font-medium">{provider}:</span> {m.text}
+    </div>
+  );
+}
+
+export default async function SettingsPage({
+  searchParams,
+}: {
+  searchParams: Promise<{ jobber?: string; quickbooks?: string }>;
+}) {
+  const params = await searchParams;
   return (
     <div className="space-y-6">
       <PageHeader title="Settings" description="Integrations and hand-maintained data." />
+
+      <OAuthNotice provider="Jobber" code={params.jobber} />
+      <OAuthNotice provider="QuickBooks" code={params.quickbooks} />
 
       <Card title="Business">
         <dl className="grid grid-cols-1 gap-3 text-sm sm:grid-cols-2">
