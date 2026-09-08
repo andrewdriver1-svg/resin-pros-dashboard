@@ -10,8 +10,8 @@ import { CsvImportForm } from '@/app/components/CsvImportForm';
 
 export const dynamic = 'force-dynamic';
 
-/** Read-only deep-link filter used by ⌘K: ?q=<text> narrows the transactions table. */
-type Filters = { q?: string };
+/** Read-only deep-link filter used by ⌘K: ?q=<text> narrows the transactions table; ?all=1 shows every row. */
+type Filters = { q?: string; all?: string };
 
 export default async function SpendingPage({ searchParams }: { searchParams: Promise<Filters> }) {
   const filters = await searchParams;
@@ -45,7 +45,7 @@ export default async function SpendingPage({ searchParams }: { searchParams: Pro
       </div>
 
       <Suspense fallback={<TableSkeleton rows={6} />}>
-        <RecentTransactions q={filters.q} />
+        <RecentTransactions q={filters.q} showAll={filters.all === '1'} />
       </Suspense>
     </div>
   );
@@ -176,22 +176,26 @@ async function ByJob() {
   );
 }
 
-async function RecentTransactions({ q }: { q?: string }) {
+const TXN_PAGE = 100;
+
+async function RecentTransactions({ q, showAll }: { q?: string; showAll?: boolean }) {
   const all = await getTransactions();
   const needle = (q ?? '').trim().toLowerCase();
-  const txns = needle
+  const matched = needle
     ? all.filter(
         (t) =>
           t.description.toLowerCase().includes(needle) ||
           getCategory(t.categoryId).label.toLowerCase().includes(needle),
       )
     : all;
+  const txns = showAll ? matched : matched.slice(0, TXN_PAGE);
+  const truncated = matched.length - txns.length;
   return (
     <Card title="Recent transactions">
       {needle && (
         <div className="mb-3 flex items-center justify-between text-xs text-ink-3">
           <span>
-            Showing {txns.length} of {all.length} transactions
+            Showing {txns.length} of {matched.length} transactions
           </span>
           <Link href="/spending" className="font-medium text-accent hover:underline">
             Clear filter
@@ -223,6 +227,13 @@ async function RecentTransactions({ q }: { q?: string }) {
             </tbody>
           </table>
         </TableWrap>
+      )}
+      {truncated > 0 && (
+        <div className="pt-3 text-center">
+          <Link href={`/spending?all=1${q ? `&q=${encodeURIComponent(q)}` : ''}`} className="text-xs font-medium text-accent hover:underline">
+            Show all {matched.length} transactions
+          </Link>
+        </div>
       )}
     </Card>
   );
