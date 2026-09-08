@@ -9,7 +9,7 @@ import { TableSkeleton } from '@/app/components/states';
 export default function DashboardLoading() {
   return (
     <div className="space-y-6">
-      <div className="h-8 w-48 animate-pulse rounded-lg bg-slate-200" />
+      <div className="h-8 w-48 animate-pulse rounded-lg bg-panel-2" />
       <TableSkeleton rows={8} />
     </div>
   );
