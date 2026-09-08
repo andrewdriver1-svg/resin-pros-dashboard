@@ -4,11 +4,14 @@ import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { useEffect, useRef, useState } from 'react';
 
+import { CommandPalette, OPEN_COMMAND_EVENT } from './CommandPalette';
+
 /**
  * Stroke SVG nav icons (18px grid): render identically on every platform,
  * recolor with the active state, and read as product chrome.
+ * Exported so the command palette renders the same iconography.
  */
-function NavIcon({ name }: { name: string }) {
+export function NavIcon({ name }: { name: string }) {
   const common = {
     viewBox: '0 0 20 20',
     className: 'h-[18px] w-[18px] shrink-0',
@@ -70,6 +73,13 @@ function NavIcon({ name }: { name: string }) {
         <svg {...common}>
           <path d="M3 8c3-3 11-3 14 0M5 11c2.5-2.2 7.5-2.2 10 0M7 14c1.7-1.4 4.3-1.4 6 0" />
           <circle cx="10" cy="16.5" r="0.9" fill="currentColor" stroke="none" />
+        </svg>
+      );
+    case 'search':
+      return (
+        <svg {...common}>
+          <circle cx="9" cy="9" r="5.5" />
+          <path d="m13.5 13.5 4 4" />
         </svg>
       );
     case 'settings':
@@ -221,6 +231,20 @@ export function Shell({
       {/* Desktop sidebar */}
       <aside className="hidden border-r border-edge bg-panel lg:flex lg:flex-col">
         <div className="border-b border-edge-soft px-5 py-4">{brand}</div>
+        <div className="px-3 pt-3">
+          {/* Looks like a search field, acts like a button: opens the ⌘K palette. */}
+          <button
+            type="button"
+            onClick={() => window.dispatchEvent(new Event(OPEN_COMMAND_EVENT))}
+            className="flex w-full items-center justify-between rounded-lg border border-edge bg-panel-2/50 px-3 py-2 text-sm text-ink-4 transition-colors duration-150 hover:border-accent/40 hover:text-ink-2"
+          >
+            <span className="flex items-center gap-2">
+              <NavIcon name="search" />
+              Search
+            </span>
+            <kbd className="rounded border border-edge bg-panel px-1.5 text-[11px]">⌘K</kbd>
+          </button>
+        </div>
         <div className="flex-1 overflow-y-auto px-3 py-4">
           <NavLinks pathname={pathname} />
         </div>
@@ -230,6 +254,15 @@ export function Shell({
       {/* Mobile top bar */}
       <div className="sticky top-0 z-30 flex items-center justify-between border-b border-edge bg-panel px-4 py-3 lg:hidden">
         <div>{brand}</div>
+        <div className="flex items-center gap-2">
+        <button
+          type="button"
+          onClick={() => window.dispatchEvent(new Event(OPEN_COMMAND_EVENT))}
+          aria-label="Search"
+          className="flex h-11 w-11 items-center justify-center rounded-lg border border-edge text-ink-2"
+        >
+          <NavIcon name="search" />
+        </button>
         <button
           ref={triggerRef}
           type="button"
@@ -244,6 +277,7 @@ export function Shell({
           </svg>
           Menu
         </button>
+        </div>
       </div>
 
       {/* Mobile drawer */}
@@ -284,6 +318,8 @@ export function Shell({
       <main className="min-w-0 px-4 py-6 sm:px-6 lg:px-8">
         <div className="mx-auto max-w-6xl">{children}</div>
       </main>
+
+      <CommandPalette />
     </div>
   );
 }
