@@ -54,20 +54,20 @@ export function CsvImportForm() {
     <form onSubmit={onSubmit} className="space-y-4">
       <div className="grid gap-3 sm:grid-cols-[1fr_auto] sm:items-end">
         <label className="block">
-          <span className="mb-1 block text-sm font-medium text-slate-700">Statement CSV</span>
+          <span className="mb-1 block text-sm font-medium text-ink-2">Statement CSV</span>
           <input
             type="file"
             accept=".csv,text/csv"
             onChange={(e) => setFile(e.target.files?.[0] ?? null)}
-            className="block w-full text-sm text-slate-600 file:mr-3 file:rounded-lg file:border-0 file:bg-slate-900 file:px-3 file:py-2 file:text-sm file:font-medium file:text-white hover:file:bg-slate-700"
+            className="block w-full text-sm text-ink-2 file:mr-3 file:rounded-lg file:border-0 file:bg-accent file:px-3 file:py-2 file:text-sm file:font-medium file:text-surface hover:file:bg-panel-2"
           />
         </label>
         <label className="block">
-          <span className="mb-1 block text-sm font-medium text-slate-700">Amount sign</span>
+          <span className="mb-1 block text-sm font-medium text-ink-2">Amount sign</span>
           <select
             value={convention}
             onChange={(e) => setConvention(e.target.value)}
-            className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm sm:w-52"
+            className="w-full rounded-lg border border-edge px-3 py-2 text-sm sm:w-52"
           >
             <option value="auto">Auto-detect</option>
             <option value="negative_is_spend">Negative = money out</option>
@@ -79,19 +79,19 @@ export function CsvImportForm() {
       <button
         type="submit"
         disabled={!file || busy}
-        className="rounded-lg bg-slate-900 px-4 py-2 text-sm font-medium text-white transition hover:bg-slate-700 disabled:opacity-50"
+        className="rounded-lg bg-accent px-4 py-2 text-sm font-medium text-surface transition hover:bg-accent-soft disabled:opacity-50"
       >
         {busy ? 'Importing…' : 'Import transactions'}
       </button>
 
       {result && !result.ok && (
-        <div className="rounded-lg border border-red-200 bg-red-50 p-3 text-sm text-red-800">
+        <div className="rounded-lg border border-red-400/30 bg-red-400/10 p-3 text-sm text-red-300">
           <strong>Import failed.</strong> {result.error}
         </div>
       )}
 
       {result && result.ok && (
-        <div className="space-y-2 rounded-lg border border-emerald-200 bg-emerald-50 p-3 text-sm text-emerald-900">
+        <div className="space-y-2 rounded-lg border border-emerald-400/30 bg-emerald-400/10 p-3 text-sm text-emerald-200">
           <div>
             <strong>Imported {result.imported ?? 0}</strong> spend transaction
             {result.imported === 1 ? '' : 's'}
@@ -99,7 +99,7 @@ export function CsvImportForm() {
             {result.persisted === false && ' (Preview only — Supabase not configured, nothing was saved.)'}
           </div>
           {result.errors && result.errors.length > 0 && (
-            <details className="text-amber-800">
+            <details className="text-amber-300">
               <summary className="cursor-pointer font-medium">
                 {result.errors.length} row(s) skipped — click to review
               </summary>

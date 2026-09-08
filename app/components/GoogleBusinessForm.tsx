@@ -26,8 +26,8 @@ export function GoogleBusinessForm({ current }: { current: GoogleBusinessSnapsho
         <Field label="Instagram followers" name="instagram_followers" type="number" min="0" defaultValue={current.instagramFollowers} />
       </div>
 
-      <label className="flex items-center gap-2 text-sm text-slate-700">
-        <input type="checkbox" name="profile_strength_ok" defaultChecked={current.profileStrengthOk} className="h-4 w-4 rounded border-slate-300" />
+      <label className="flex items-center gap-2 text-sm text-ink-2">
+        <input type="checkbox" name="profile_strength_ok" defaultChecked={current.profileStrengthOk} className="h-4 w-4 rounded border-edge" />
         Profile is complete / in good standing
       </label>
 
@@ -35,15 +35,15 @@ export function GoogleBusinessForm({ current }: { current: GoogleBusinessSnapsho
         <button
           type="submit"
           disabled={pending}
-          className="rounded-lg bg-slate-900 px-4 py-2 text-sm font-medium text-white transition hover:bg-slate-700 disabled:opacity-50"
+          className="rounded-lg bg-accent px-4 py-2 text-sm font-medium text-surface transition hover:bg-accent-soft disabled:opacity-50"
         >
           {pending ? 'Saving…' : 'Save snapshot'}
         </button>
-        <span className="text-xs text-slate-400">Last updated {formatDateTime(current.updatedAt)}</span>
+        <span className="text-xs text-ink-4">Last updated {formatDateTime(current.updatedAt)}</span>
       </div>
 
       {state.message && (
-        <p className={`text-sm ${state.ok ? 'text-emerald-700' : 'text-amber-700'}`}>{state.message}</p>
+        <p className={`text-sm ${state.ok ? 'text-emerald-300' : 'text-amber-300'}`}>{state.message}</p>
       )}
     </form>
   );
@@ -63,12 +63,12 @@ function Field({
 } & React.InputHTMLAttributes<HTMLInputElement>) {
   return (
     <label className="block">
-      <span className="mb-1 block text-sm font-medium text-slate-700">{label}</span>
+      <span className="mb-1 block text-sm font-medium text-ink-2">{label}</span>
       <input
         name={name}
         type={type}
         defaultValue={defaultValue}
-        className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm outline-none focus:border-slate-900 focus:ring-1 focus:ring-slate-900"
+        className="w-full rounded-lg border border-edge px-3 py-2 text-sm outline-none focus:border-accent focus:ring-1 focus:ring-accent"
         {...rest}
       />
     </label>

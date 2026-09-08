@@ -73,15 +73,15 @@ export function humanizeStatus(status: string): string {
     .join(' ');
 }
 
-/** Tailwind classes for a status badge, by rough semantic bucket. */
+/** Tailwind classes for a status badge, by rough semantic bucket (dark theme). */
 export function statusTone(status: string): string {
   const positive = ['paid', 'approved', 'converted', 'complete', 'received', 'won'];
   const warn = ['past_due', 'awaiting_response', 'partial', 'needed', 'sent', 'contacted', 'quoted'];
   const active = ['in_progress', 'scheduled', 'ordered', 'new', 'invoiced', 'lead'];
   const muted = ['archived', 'draft', 'lost', 'bad_debt', 'unknown'];
-  if (positive.includes(status)) return 'bg-emerald-100 text-emerald-800';
-  if (warn.includes(status)) return 'bg-amber-100 text-amber-800';
-  if (active.includes(status)) return 'bg-sky-100 text-sky-800';
-  if (muted.includes(status)) return 'bg-slate-100 text-slate-600';
-  return 'bg-slate-100 text-slate-600';
+  if (positive.includes(status)) return 'bg-emerald-400/10 text-emerald-300 ring-1 ring-inset ring-emerald-400/20';
+  if (warn.includes(status)) return 'bg-amber-400/10 text-amber-300 ring-1 ring-inset ring-amber-400/20';
+  if (active.includes(status)) return 'bg-sky-400/10 text-sky-300 ring-1 ring-inset ring-sky-400/20';
+  if (muted.includes(status)) return 'bg-panel-2 text-ink-3 ring-1 ring-inset ring-edge';
+  return 'bg-panel-2 text-ink-3 ring-1 ring-inset ring-edge';
 }

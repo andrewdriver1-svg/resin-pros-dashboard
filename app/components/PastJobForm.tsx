@@ -32,7 +32,7 @@ export function PastJobForm() {
 
   const year = new Date().getFullYear();
   const input =
-    "w-full rounded-md border border-slate-200 px-3 py-2 text-sm focus:border-slate-400 focus:outline-none";
+    "w-full rounded-md border border-edge px-3 py-2 text-sm focus:border-accent focus:outline-none";
 
   return (
     <form onSubmit={onSubmit} className="space-y-3">
@@ -50,16 +50,16 @@ export function PastJobForm() {
         <button
           type="submit"
           disabled={pending}
-          className="rounded-md bg-slate-900 px-4 py-2 text-sm font-medium text-white hover:bg-slate-700 disabled:opacity-50"
+          className="rounded-md bg-accent px-4 py-2 text-sm font-medium text-surface hover:bg-accent-soft disabled:opacity-50"
         >
           {pending ? "Saving…" : "Add past job"}
         </button>
         {result && result.ok && (
-          <span className="text-sm text-emerald-600">
+          <span className="text-sm text-good">
             Saved{result.geocoded ? ` — mapped to ${result.matchedAddress}` : " (address not mapped — check spelling)"}
           </span>
         )}
-        {result && !result.ok && <span className="text-sm text-red-600">{result.error}</span>}
+        {result && !result.ok && <span className="text-sm text-bad">{result.error}</span>}
       </div>
     </form>
   );
