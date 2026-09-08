@@ -54,20 +54,20 @@ async function TodoList() {
 
   return (
     <Card>
-      <ul className="divide-y divide-slate-100">
+      <ul className="divide-y divide-edge-soft">
         {sorted.map((t) => (
           <li key={t.id} className="flex flex-col gap-2 py-3 sm:flex-row sm:items-center sm:justify-between">
             <div className="min-w-0">
               <div className="flex items-center gap-2">
-                <span className="text-sm font-medium text-slate-900">{t.item}</span>
-                {t.quantity && <span className="text-xs text-slate-500">×{t.quantity}</span>}
-                <span className="rounded bg-slate-100 px-1.5 py-0.5 text-xs text-slate-500">
+                <span className="text-sm font-medium text-ink">{t.item}</span>
+                {t.quantity && <span className="text-xs text-ink-3">×{t.quantity}</span>}
+                <span className="rounded bg-panel-2 px-1.5 py-0.5 text-xs text-ink-3">
                   {t.kind === 'equipment' ? 'Equipment' : 'Material'}
                 </span>
               </div>
-              <div className="mt-0.5 text-xs text-slate-500">
+              <div className="mt-0.5 text-xs text-ink-3">
                 {t.jobId ? (
-                  <Link href={`/jobs/${t.jobId}`} className="text-sky-700 hover:underline">
+                  <Link href={`/jobs/${t.jobId}`} className="text-accent hover:underline">
                     {jobTitle(t.jobId) ?? 'Linked job'}
                   </Link>
                 ) : (
