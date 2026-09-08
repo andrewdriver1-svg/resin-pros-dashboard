@@ -34,7 +34,7 @@ async function LeadsTable() {
       <TableWrap>
         <table className="min-w-full text-sm">
           <thead>
-            <tr className="border-b border-slate-100 text-left text-xs uppercase tracking-wide text-slate-500">
+            <tr className="border-b border-edge-soft text-left text-xs uppercase tracking-wide text-ink-3">
               <th className="px-3 py-2 font-medium">Client</th>
               <th className="px-3 py-2 font-medium">What they want</th>
               <th className="px-3 py-2 font-medium">Source</th>
@@ -42,34 +42,34 @@ async function LeadsTable() {
               <th className="px-3 py-2 font-medium">Status</th>
             </tr>
           </thead>
-          <tbody className="divide-y divide-slate-100">
+          <tbody className="divide-y divide-edge-soft">
             {leads.map((lead) => (
               <tr key={lead.id} className="align-top">
                 <td className="px-3 py-3">
-                  <div className="font-medium text-slate-900">{lead.clientName}</div>
+                  <div className="font-medium text-ink">{lead.clientName}</div>
                   {/* Calling a fresh lead back fast is the whole game — these
                       must be one-tap dial/email on a phone, and when a lead has
                       both, show both (the old `??` chain hid the phone number
                       whenever an email existed). */}
                   <div className="flex flex-wrap gap-x-3 text-xs">
                     {lead.contactPhone && (
-                      <a href={`tel:${lead.contactPhone.replace(/[^+\d]/g, '')}`} className="text-sky-700 hover:underline">
+                      <a href={`tel:${lead.contactPhone.replace(/[^+\d]/g, '')}`} className="text-accent hover:underline">
                         {lead.contactPhone}
                       </a>
                     )}
                     {lead.contactEmail && (
-                      <a href={`mailto:${lead.contactEmail}`} className="text-sky-700 hover:underline">
+                      <a href={`mailto:${lead.contactEmail}`} className="text-accent hover:underline">
                         {lead.contactEmail}
                       </a>
                     )}
                     {!lead.contactPhone && !lead.contactEmail && (
-                      <span className="text-slate-500">No contact info</span>
+                      <span className="text-ink-3">No contact info</span>
                     )}
                   </div>
                 </td>
-                <td className="max-w-xs px-3 py-3 text-slate-600">{lead.summary}</td>
-                <td className="px-3 py-3 text-slate-600">{lead.source.replace(/_/g, ' ')}</td>
-                <td className="whitespace-nowrap px-3 py-3 text-slate-500">{relativeTime(lead.receivedAt)}</td>
+                <td className="max-w-xs px-3 py-3 text-ink-2">{lead.summary}</td>
+                <td className="px-3 py-3 text-ink-2">{lead.source.replace(/_/g, ' ')}</td>
+                <td className="whitespace-nowrap px-3 py-3 text-ink-3">{relativeTime(lead.receivedAt)}</td>
                 <td className="px-3 py-3">
                   <StatusBadge status={lead.status} />
                 </td>
