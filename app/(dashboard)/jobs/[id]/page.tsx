@@ -27,7 +27,7 @@ export default async function JobDetailPage({ params }: { params: Promise<{ id: 
         actions={
           <>
             <StatusBadge status={job.status} />
-            <Link href="/jobs" className="text-xs font-medium text-sky-700 hover:underline">
+            <Link href="/jobs" className="text-xs font-medium text-accent hover:underline">
               ← Back to jobs
             </Link>
           </>
@@ -54,23 +54,23 @@ export default async function JobDetailPage({ params }: { params: Promise<{ id: 
         <Card title="Details">
           <dl className="grid grid-cols-1 gap-4 text-sm sm:grid-cols-3">
             <div>
-              <dt className="text-xs uppercase tracking-wide text-slate-500">Scheduled</dt>
-              <dd className="mt-0.5 text-slate-800">{formatDate(job.scheduledAt)}</dd>
+              <dt className="text-xs uppercase tracking-wide text-ink-3">Scheduled</dt>
+              <dd className="mt-0.5 text-ink">{formatDate(job.scheduledAt)}</dd>
             </div>
             <div>
-              <dt className="text-xs uppercase tracking-wide text-slate-500">Completed</dt>
-              <dd className="mt-0.5 text-slate-800">{formatDate(job.completedAt)}</dd>
+              <dt className="text-xs uppercase tracking-wide text-ink-3">Completed</dt>
+              <dd className="mt-0.5 text-ink">{formatDate(job.completedAt)}</dd>
             </div>
             <div>
-              <dt className="text-xs uppercase tracking-wide text-slate-500">Jobber ID</dt>
-              <dd className="mt-0.5 truncate text-slate-800" title={job.jobberId}>
+              <dt className="text-xs uppercase tracking-wide text-ink-3">Jobber ID</dt>
+              <dd className="mt-0.5 truncate text-ink" title={job.jobberId}>
                 {job.jobberId ?? '—'}
               </dd>
             </div>
             {job.notes && (
               <div className="sm:col-span-3">
-                <dt className="text-xs uppercase tracking-wide text-slate-500">Notes</dt>
-                <dd className="mt-0.5 text-slate-800">{job.notes}</dd>
+                <dt className="text-xs uppercase tracking-wide text-ink-3">Notes</dt>
+                <dd className="mt-0.5 text-ink">{job.notes}</dd>
               </div>
             )}
           </dl>
@@ -82,16 +82,16 @@ export default async function JobDetailPage({ params }: { params: Promise<{ id: 
           {job.quotes.length === 0 ? (
             <EmptyState title="No quotes" message="No quotes are linked to this job." />
           ) : (
-            <ul className="divide-y divide-slate-100">
+            <ul className="divide-y divide-edge-soft">
               {job.quotes.map((q) => (
                 <li key={q.id} className="flex items-center justify-between py-2.5 text-sm">
                   <div>
-                    <div className="font-medium text-slate-900">{q.number}</div>
-                    <div className="text-xs text-slate-500">{formatDate(q.issuedAt)}</div>
+                    <div className="font-medium text-ink">{q.number}</div>
+                    <div className="text-xs text-ink-3">{formatDate(q.issuedAt)}</div>
                   </div>
                   <div className="flex items-center gap-3">
                     <StatusBadge status={q.status} />
-                    <span className="font-medium text-slate-900">{formatMoney(q.amount)}</span>
+                    <span className="font-medium text-ink">{formatMoney(q.amount)}</span>
                   </div>
                 </li>
               ))}
@@ -103,18 +103,18 @@ export default async function JobDetailPage({ params }: { params: Promise<{ id: 
           {job.invoices.length === 0 ? (
             <EmptyState title="No invoices" message="No invoices are linked to this job yet." />
           ) : (
-            <ul className="divide-y divide-slate-100">
+            <ul className="divide-y divide-edge-soft">
               {job.invoices.map((inv) => (
                 <li key={inv.id} className="flex items-center justify-between py-2.5 text-sm">
                   <div>
-                    <div className="font-medium text-slate-900">{inv.number}</div>
-                    <div className="text-xs text-slate-500">
+                    <div className="font-medium text-ink">{inv.number}</div>
+                    <div className="text-xs text-ink-3">
                       Due {formatDate(inv.dueAt)} · paid {formatMoney(inv.amountPaid)}
                     </div>
                   </div>
                   <div className="flex items-center gap-3">
                     <StatusBadge status={inv.status} />
-                    <span className="font-medium text-slate-900">{formatMoney(inv.amount)}</span>
+                    <span className="font-medium text-ink">{formatMoney(inv.amount)}</span>
                   </div>
                 </li>
               ))}
@@ -133,7 +133,7 @@ export default async function JobDetailPage({ params }: { params: Promise<{ id: 
           <TableWrap>
             <table className="min-w-full text-sm">
               <thead>
-                <tr className="border-b border-slate-100 text-left text-xs uppercase tracking-wide text-slate-500">
+                <tr className="border-b border-edge-soft text-left text-xs uppercase tracking-wide text-ink-3">
                   <th className="px-3 py-2 font-medium">Date</th>
                   <th className="px-3 py-2 font-medium">Description</th>
                   <th className="px-3 py-2 font-medium">Category</th>
@@ -141,25 +141,25 @@ export default async function JobDetailPage({ params }: { params: Promise<{ id: 
                   <th className="px-3 py-2 text-right font-medium">Amount</th>
                 </tr>
               </thead>
-              <tbody className="divide-y divide-slate-100">
+              <tbody className="divide-y divide-edge-soft">
                 {job.costs.map((c) => (
                   <tr key={c.id}>
-                    <td className="whitespace-nowrap px-3 py-2.5 text-slate-600">{formatDate(c.date)}</td>
-                    <td className="px-3 py-2.5 text-slate-800">{c.description}</td>
-                    <td className="px-3 py-2.5 text-slate-600">{getCategory(c.categoryId).label}</td>
-                    <td className="px-3 py-2.5 text-xs text-slate-500">{c.source.replace(/_/g, ' ')}</td>
-                    <td className="whitespace-nowrap px-3 py-2.5 text-right font-medium text-slate-900">
+                    <td className="whitespace-nowrap px-3 py-2.5 text-ink-2">{formatDate(c.date)}</td>
+                    <td className="px-3 py-2.5 text-ink">{c.description}</td>
+                    <td className="px-3 py-2.5 text-ink-2">{getCategory(c.categoryId).label}</td>
+                    <td className="px-3 py-2.5 text-xs text-ink-3">{c.source.replace(/_/g, ' ')}</td>
+                    <td className="whitespace-nowrap px-3 py-2.5 text-right font-medium text-ink">
                       {formatMoney(c.amount)}
                     </td>
                   </tr>
                 ))}
               </tbody>
               <tfoot>
-                <tr className="border-t border-slate-200">
-                  <td colSpan={4} className="px-3 py-2.5 text-right text-xs font-medium uppercase text-slate-500">
+                <tr className="border-t border-edge">
+                  <td colSpan={4} className="px-3 py-2.5 text-right text-xs font-medium uppercase text-ink-3">
                     Total
                   </td>
-                  <td className="whitespace-nowrap px-3 py-2.5 text-right font-semibold text-slate-900">
+                  <td className="whitespace-nowrap px-3 py-2.5 text-right font-semibold text-ink">
                     {formatMoney(totalCost)}
                   </td>
                 </tr>
@@ -173,15 +173,15 @@ export default async function JobDetailPage({ params }: { params: Promise<{ id: 
         {job.todos.length === 0 ? (
           <EmptyState title="Nothing to order" message="No material or equipment to-dos are linked to this job." />
         ) : (
-          <ul className="divide-y divide-slate-100">
+          <ul className="divide-y divide-edge-soft">
             {job.todos.map((t) => (
               <li key={t.id} className="flex items-center justify-between gap-3 py-2.5 text-sm">
                 <div className="min-w-0">
-                  <div className="truncate font-medium text-slate-900">
+                  <div className="truncate font-medium text-ink">
                     {t.item}
                     {t.quantity ? ` · ${t.quantity}` : ''}
                   </div>
-                  <div className="text-xs text-slate-500">
+                  <div className="text-xs text-ink-3">
                     {t.kind === 'equipment' ? 'Equipment' : 'Material'}
                     {t.neededBy ? ` · needed by ${formatDate(t.neededBy)}` : ''}
                   </div>
