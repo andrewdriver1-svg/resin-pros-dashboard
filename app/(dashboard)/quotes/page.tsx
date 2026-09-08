@@ -41,9 +41,9 @@ async function MoneyStats() {
 }
 
 function JobLink({ jobId, children }: { jobId?: string; children: React.ReactNode }) {
-  if (!jobId) return <span className="text-slate-400">—</span>;
+  if (!jobId) return <span className="text-ink-4">—</span>;
   return (
-    <Link href={`/jobs/${jobId}`} className="text-sky-700 hover:underline">
+    <Link href={`/jobs/${jobId}`} className="text-accent hover:underline">
       {children}
     </Link>
   );
@@ -59,7 +59,7 @@ async function Quotes() {
         <TableWrap>
           <table className="min-w-full text-sm">
             <thead>
-              <tr className="border-b border-slate-100 text-left text-xs uppercase tracking-wide text-slate-500">
+              <tr className="border-b border-edge-soft text-left text-xs uppercase tracking-wide text-ink-3">
                 <th className="px-3 py-2 font-medium">Quote</th>
                 <th className="px-3 py-2 font-medium">Client</th>
                 <th className="px-3 py-2 font-medium">Job</th>
@@ -67,14 +67,14 @@ async function Quotes() {
                 <th className="px-3 py-2 text-right font-medium">Amount</th>
               </tr>
             </thead>
-            <tbody className="divide-y divide-slate-100">
+            <tbody className="divide-y divide-edge-soft">
               {quotes.map((q) => (
                 <tr key={q.id}>
-                  <td className="px-3 py-2.5 font-medium text-slate-900">{q.number}</td>
-                  <td className="px-3 py-2.5 text-slate-600">{q.clientName}</td>
+                  <td className="px-3 py-2.5 font-medium text-ink">{q.number}</td>
+                  <td className="px-3 py-2.5 text-ink-2">{q.clientName}</td>
                   <td className="px-3 py-2.5"><JobLink jobId={q.jobId}>View</JobLink></td>
                   <td className="px-3 py-2.5"><StatusBadge status={q.status} /></td>
-                  <td className="whitespace-nowrap px-3 py-2.5 text-right font-medium text-slate-900">{formatMoney(q.amount)}</td>
+                  <td className="whitespace-nowrap px-3 py-2.5 text-right font-medium text-ink">{formatMoney(q.amount)}</td>
                 </tr>
               ))}
             </tbody>
@@ -95,7 +95,7 @@ async function Invoices() {
         <TableWrap>
           <table className="min-w-full text-sm">
             <thead>
-              <tr className="border-b border-slate-100 text-left text-xs uppercase tracking-wide text-slate-500">
+              <tr className="border-b border-edge-soft text-left text-xs uppercase tracking-wide text-ink-3">
                 <th className="px-3 py-2 font-medium">Invoice</th>
                 <th className="px-3 py-2 font-medium">Client</th>
                 <th className="px-3 py-2 font-medium">Job</th>
@@ -104,17 +104,17 @@ async function Invoices() {
                 <th className="px-3 py-2 text-right font-medium">Balance</th>
               </tr>
             </thead>
-            <tbody className="divide-y divide-slate-100">
+            <tbody className="divide-y divide-edge-soft">
               {invoices.map((inv) => {
                 const balance = Math.max(0, inv.amount - inv.amountPaid);
                 return (
                   <tr key={inv.id}>
-                    <td className="px-3 py-2.5 font-medium text-slate-900">{inv.number}</td>
-                    <td className="px-3 py-2.5 text-slate-600">{inv.clientName}</td>
+                    <td className="px-3 py-2.5 font-medium text-ink">{inv.number}</td>
+                    <td className="px-3 py-2.5 text-ink-2">{inv.clientName}</td>
                     <td className="px-3 py-2.5"><JobLink jobId={inv.jobId}>View</JobLink></td>
-                    <td className="whitespace-nowrap px-3 py-2.5 text-slate-600">{formatDate(inv.dueAt)}</td>
+                    <td className="whitespace-nowrap px-3 py-2.5 text-ink-2">{formatDate(inv.dueAt)}</td>
                     <td className="px-3 py-2.5"><StatusBadge status={inv.status} /></td>
-                    <td className="whitespace-nowrap px-3 py-2.5 text-right font-medium text-slate-900">{formatMoney(balance)}</td>
+                    <td className="whitespace-nowrap px-3 py-2.5 text-right font-medium text-ink">{formatMoney(balance)}</td>
                   </tr>
                 );
               })}
