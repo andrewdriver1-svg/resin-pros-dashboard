@@ -44,8 +44,8 @@ function FilterBar({ filters }: { filters: Filters }) {
         href={chipHref(filters, value)}
         className={`inline-flex min-h-9 items-center rounded-full border px-3.5 text-sm font-medium transition ${
           isActive
-            ? 'border-slate-900 bg-slate-900 text-white'
-            : 'border-slate-300 bg-white text-slate-600 hover:border-slate-400 hover:text-slate-900'
+            ? 'border-accent bg-accent text-surface'
+            : 'border-edge bg-panel text-ink-2 hover:border-accent/50 hover:text-ink'
         }`}
         aria-current={isActive ? 'true' : undefined}
       >
@@ -70,11 +70,11 @@ function FilterBar({ filters }: { filters: Filters }) {
           defaultValue={filters.q ?? ''}
           placeholder="Search job, client, address…"
           aria-label="Search jobs"
-          className="w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm text-slate-900 placeholder:text-slate-400 focus:border-slate-900 focus:ring-1 focus:ring-slate-900 sm:w-64"
+          className="w-full rounded-lg border border-edge bg-panel px-3 py-2 text-sm text-ink placeholder:text-ink-4 focus:border-accent focus:ring-1 focus:ring-accent sm:w-64"
         />
         <button
           type="submit"
-          className="rounded-lg bg-slate-900 px-3.5 py-2 text-sm font-medium text-white transition hover:bg-slate-700"
+          className="rounded-lg bg-accent px-3.5 py-2 text-sm font-medium text-surface transition hover:bg-accent-soft"
         >
           Search
         </button>
@@ -133,11 +133,11 @@ async function JobsTable({ filters }: { filters: Filters }) {
   return (
     <Card>
       {filtered && (
-        <div className="mb-3 flex items-center justify-between text-xs text-slate-500">
+        <div className="mb-3 flex items-center justify-between text-xs text-ink-3">
           <span>
             Showing {visible.length} of {jobs.length} jobs
           </span>
-          <Link href="/jobs" className="font-medium text-sky-700 hover:underline">
+          <Link href="/jobs" className="font-medium text-accent hover:underline">
             Clear filters
           </Link>
         </div>
@@ -147,7 +147,7 @@ async function JobsTable({ filters }: { filters: Filters }) {
           title="No jobs match"
           message="Try a different search, or clear the filters to see everything."
           action={
-            <Link href="/jobs" className="text-sm font-medium text-sky-700 hover:underline">
+            <Link href="/jobs" className="text-sm font-medium text-accent hover:underline">
               Clear filters
             </Link>
           }
@@ -156,7 +156,7 @@ async function JobsTable({ filters }: { filters: Filters }) {
         <TableWrap label="Jobs">
           <table className="min-w-full text-sm">
             <thead>
-              <tr className="border-b border-slate-100 text-left text-xs uppercase tracking-wide text-slate-500">
+              <tr className="border-b border-edge-soft text-left text-xs uppercase tracking-wide text-ink-3">
                 <th scope="col" className="px-3 py-2 font-medium">
                   Job
                 </th>
@@ -174,13 +174,13 @@ async function JobsTable({ filters }: { filters: Filters }) {
                 </th>
               </tr>
             </thead>
-            <tbody className="divide-y divide-slate-100">
+            <tbody className="divide-y divide-edge-soft">
               {visible.map((job) => (
-                <tr key={job.id} className="hover:bg-slate-50">
+                <tr key={job.id} className="hover:bg-panel-2">
                   <td className="px-3 py-3">
                     {/* Sky, not body-black: on a phone there is no hover, so a
                         link has to look like one before it's touched. */}
-                    <Link href={`/jobs/${job.id}`} className="font-medium text-sky-700 hover:underline">
+                    <Link href={`/jobs/${job.id}`} className="font-medium text-accent hover:underline">
                       {job.title}
                     </Link>
                     {job.address && (
@@ -190,19 +190,19 @@ async function JobsTable({ filters }: { filters: Filters }) {
                           href={`https://maps.google.com/?q=${encodeURIComponent(job.address)}`}
                           target="_blank"
                           rel="noreferrer"
-                          className="text-slate-500 underline decoration-slate-300 underline-offset-2 hover:text-sky-700"
+                          className="text-ink-3 underline decoration-edge underline-offset-2 hover:text-accent"
                         >
                           {job.address}
                         </a>
                       </div>
                     )}
                   </td>
-                  <td className="px-3 py-3 text-slate-600">{job.clientName}</td>
-                  <td className="whitespace-nowrap px-3 py-3 text-slate-600">{formatDate(job.scheduledAt)}</td>
+                  <td className="px-3 py-3 text-ink-2">{job.clientName}</td>
+                  <td className="whitespace-nowrap px-3 py-3 text-ink-2">{formatDate(job.scheduledAt)}</td>
                   <td className="px-3 py-3">
                     <StatusBadge status={job.status} />
                   </td>
-                  <td className="whitespace-nowrap px-3 py-3 text-right font-medium tabular-nums text-slate-900">
+                  <td className="whitespace-nowrap px-3 py-3 text-right font-medium tabular-nums text-ink">
                     {formatMoney(job.value)}
                   </td>
                 </tr>
