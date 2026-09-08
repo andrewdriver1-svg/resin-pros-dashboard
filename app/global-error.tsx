@@ -7,7 +7,7 @@
 export default function GlobalError({ error, reset }: { error: Error & { digest?: string }; reset: () => void }) {
   return (
     <html lang="en">
-      <body style={{ fontFamily: 'system-ui, sans-serif', padding: '4rem', textAlign: 'center' }}>
+      <body style={{ fontFamily: 'system-ui, sans-serif', padding: '4rem', textAlign: 'center', background: '#0a101d', color: '#e9eef6', minHeight: '100vh', margin: 0 }}>
         <h1 style={{ fontSize: '1.25rem', fontWeight: 600 }}>Something went wrong</h1>
         <p style={{ color: '#64748b', marginTop: '0.5rem' }}>
           The app hit an unexpected error. Try reloading.
@@ -16,7 +16,7 @@ export default function GlobalError({ error, reset }: { error: Error & { digest?
         <button
           type="button"
           onClick={reset}
-          style={{ marginTop: '1.5rem', background: '#0f172a', color: 'white', border: 0, borderRadius: 8, padding: '0.5rem 1rem', cursor: 'pointer' }}
+          style={{ marginTop: '1.5rem', background: '#38bdf8', color: '#0a101d', border: 0, borderRadius: 8, padding: '0.5rem 1rem', cursor: 'pointer', fontWeight: 600 }}
         >
           Reload
         </button>

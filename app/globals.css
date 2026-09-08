@@ -1,7 +1,40 @@
 @import 'tailwindcss';
 
+/*
+ * Design tokens — restrained dark command-center theme.
+ *
+ * Semantic names, not raw grays: pages say `bg-panel` / `text-ink-3` so the
+ * palette can be tuned in ONE place. The scale is a blue-cast near-black —
+ * "financial software at night", not sci-fi.
+ *
+ *   surface   page background (darkest)
+ *   panel     cards / sidebar
+ *   panel-2   raised & hover surfaces, skeletons
+ *   edge      strong borders          edge-soft   hairlines / dividers
+ *   ink       primary text            ink-2       body text
+ *   ink-3     secondary text          ink-4       faint text (metadata)
+ *   accent    links & interactive     (WCAG AA on panel: ink-3 ≈ 5.5:1)
+ *   good / warn / bad   reserved status colors — never used for decoration
+ */
+@theme {
+  --color-surface: #0a101d;
+  --color-panel: #101828;
+  --color-panel-2: #182238;
+  --color-edge: #253048;
+  --color-edge-soft: #1b2436;
+  --color-ink: #e9eef6;
+  --color-ink-2: #b6c1d2;
+  --color-ink-3: #8e9bb0;
+  --color-ink-4: #66738a;
+  --color-accent: #38bdf8;
+  --color-accent-soft: #7dd3fc;
+  --color-good: #34d399;
+  --color-warn: #fbbf24;
+  --color-bad: #f87171;
+}
+
 :root {
-  color-scheme: light;
+  color-scheme: dark;
 }
 
 html,
@@ -10,7 +43,7 @@ body {
 }
 
 body {
-  @apply bg-slate-50 text-slate-900 antialiased;
+  @apply bg-surface text-ink antialiased;
   font-family:
     ui-sans-serif, system-ui, -apple-system, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
 }
@@ -31,13 +64,13 @@ body {
  */
 .table-scroll {
   scrollbar-width: thin;
-  scrollbar-color: rgb(203 213 225) transparent;
+  scrollbar-color: #2c3852 transparent;
 }
 .table-scroll::-webkit-scrollbar {
   height: 8px;
 }
 .table-scroll::-webkit-scrollbar-thumb {
-  background: rgb(203 213 225);
+  background: #2c3852;
   border-radius: 4px;
 }
 .table-scroll::-webkit-scrollbar-track {
@@ -45,11 +78,33 @@ body {
 }
 
 /*
- * Keyboard users need to SEE where they are. Buttons, links and the nav had no
- * focus-visible styling at all; the browser default vanishes on our dark
- * active-nav chip. One consistent ring, only on keyboard focus.
+ * Keyboard users need to SEE where they are. One consistent ring, only on
+ * keyboard focus — bright enough to read against the dark chrome.
  */
 :where(a, button, [role='button'], input, select, textarea, summary):focus-visible {
-  outline: 2px solid rgb(2 132 199);
+  outline: 2px solid #38bdf8;
   outline-offset: 2px;
+}
+
+/*
+ * Number transitions: KPI values animate in with a short fade-rise. 200ms,
+ * communicates "fresh data", respects reduced-motion.
+ */
+@keyframes rise-in {
+  from {
+    opacity: 0;
+    transform: translateY(4px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+.rise-in {
+  animation: rise-in 200ms ease-out both;
+}
+@media (prefers-reduced-motion: reduce) {
+  .rise-in {
+    animation: none;
+  }
 }
