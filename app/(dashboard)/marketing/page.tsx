@@ -37,7 +37,7 @@ export default function MarketingPage() {
       </Suspense>
       {guerrillaConfigured() && (
         <Card title="Add a past job (cash / pre-Jobber)">
-          <p className="mb-3 text-sm text-slate-500">
+          <p className="mb-3 text-sm text-ink-3">
             Old jobs that never made it into a system still count for neighborhood targeting.
             Address and rough value are enough.
           </p>
@@ -80,7 +80,7 @@ async function ChannelTable() {
       <TableWrap>
         <table className="min-w-full text-sm">
           <thead>
-            <tr className="border-b border-slate-100 text-left text-xs uppercase tracking-wide text-slate-500">
+            <tr className="border-b border-edge-soft text-left text-xs uppercase tracking-wide text-ink-3">
               <th className="px-3 py-2 font-medium">Channel</th>
               <th className="px-3 py-2 font-medium">Month</th>
               <th className="px-3 py-2 text-right font-medium">Spend</th>
@@ -89,17 +89,17 @@ async function ChannelTable() {
               <th className="px-3 py-2 text-right font-medium">Cost / lead</th>
             </tr>
           </thead>
-          <tbody className="divide-y divide-slate-100">
+          <tbody className="divide-y divide-edge-soft">
             {entries.map((e) => {
               const cpl = e.leads > 0 ? e.spend / e.leads : null;
               return (
                 <tr key={e.id}>
-                  <td className="px-3 py-2.5 font-medium text-slate-900">{e.channel}</td>
-                  <td className="whitespace-nowrap px-3 py-2.5 text-slate-600">{formatDate(e.period)}</td>
-                  <td className="whitespace-nowrap px-3 py-2.5 text-right text-slate-700">{formatMoney(e.spend)}</td>
-                  <td className="px-3 py-2.5 text-right text-slate-700">{e.leads}</td>
-                  <td className="px-3 py-2.5 text-right text-slate-700">{e.wonJobs}</td>
-                  <td className="whitespace-nowrap px-3 py-2.5 text-right text-slate-700">
+                  <td className="px-3 py-2.5 font-medium text-ink">{e.channel}</td>
+                  <td className="whitespace-nowrap px-3 py-2.5 text-ink-2">{formatDate(e.period)}</td>
+                  <td className="whitespace-nowrap px-3 py-2.5 text-right text-ink-2">{formatMoney(e.spend)}</td>
+                  <td className="px-3 py-2.5 text-right text-ink-2">{e.leads}</td>
+                  <td className="px-3 py-2.5 text-right text-ink-2">{e.wonJobs}</td>
+                  <td className="whitespace-nowrap px-3 py-2.5 text-right text-ink-2">
                     {cpl == null ? '—' : formatMoney(cpl)}
                   </td>
                 </tr>
@@ -131,7 +131,7 @@ async function BidRadar() {
       <TableWrap>
         <table className="min-w-full text-sm">
           <thead>
-            <tr className="border-b border-slate-100 text-left text-xs uppercase tracking-wide text-slate-500">
+            <tr className="border-b border-edge-soft text-left text-xs uppercase tracking-wide text-ink-3">
               <th className="px-3 py-2 font-medium">Score</th>
               <th className="px-3 py-2 font-medium">Deadline</th>
               <th className="px-3 py-2 font-medium">Opportunity</th>
@@ -142,22 +142,22 @@ async function BidRadar() {
           </thead>
           <tbody>
             {data.shortlist.map((b) => (
-              <tr key={b.external_id} className="border-b border-slate-50 align-top">
+              <tr key={b.external_id} className="border-b border-edge-soft align-top">
                 <td className="whitespace-nowrap px-3 py-2">
-                  <span className={`inline-block rounded px-1.5 py-0.5 text-xs font-semibold ${Number(b.go_no_go_score) >= 70 ? 'bg-emerald-100 text-emerald-800' : Number(b.go_no_go_score) >= 45 ? 'bg-amber-100 text-amber-800' : 'bg-slate-100 text-slate-600'}`}>
+                  <span className={`inline-block rounded px-1.5 py-0.5 text-xs font-semibold ${Number(b.go_no_go_score) >= 70 ? 'bg-emerald-400/10 ring-1 ring-inset ring-emerald-400/20 text-emerald-300' : Number(b.go_no_go_score) >= 45 ? 'bg-amber-400/10 ring-1 ring-inset ring-amber-400/20 text-amber-300' : 'bg-panel-2 text-ink-2'}`}>
                     {b.go_no_go_score ? Math.round(Number(b.go_no_go_score)) : '—'}
                   </span>
                 </td>
                 <td className="whitespace-nowrap px-3 py-2">{formatDate(b.deadline_at)}</td>
                 <td className="max-w-md px-3 py-2">
                   {b.url ? (
-                    <a href={b.url} target="_blank" rel="noreferrer" className="text-blue-600 hover:underline">
+                    <a href={b.url} target="_blank" rel="noreferrer" className="text-accent hover:underline">
                       {b.title}
                     </a>
                   ) : (
                     b.title
                   )}
-                  <div className="text-xs text-slate-500">{b.agency}{b.sol_number ? ` · ${b.sol_number}` : ''}</div>
+                  <div className="text-xs text-ink-3">{b.agency}{b.sol_number ? ` · ${b.sol_number}` : ''}</div>
                 </td>
                 <td className="whitespace-nowrap px-3 py-2">{b.place ?? '—'}</td>
                 <td className="whitespace-nowrap px-3 py-2">{b.distance_miles ? Math.round(Number(b.distance_miles)) : '—'}</td>
@@ -181,7 +181,7 @@ async function RevenueNeighborhoods() {
       <TableWrap>
         <table className="min-w-full text-sm">
           <thead>
-            <tr className="border-b border-slate-100 text-left text-xs uppercase tracking-wide text-slate-500">
+            <tr className="border-b border-edge-soft text-left text-xs uppercase tracking-wide text-ink-3">
               <th className="px-3 py-2 font-medium">Block group</th>
               <th className="px-3 py-2 font-medium">Jobs</th>
               <th className="px-3 py-2 font-medium">Revenue</th>
@@ -189,7 +189,7 @@ async function RevenueNeighborhoods() {
           </thead>
           <tbody>
             {top.map((n) => (
-              <tr key={n.blockGroup} className="border-b border-slate-50">
+              <tr key={n.blockGroup} className="border-b border-edge-soft">
                 <td className="whitespace-nowrap px-3 py-2 font-mono text-xs">{n.blockGroup}</td>
                 <td className="px-3 py-2">{n.jobCount}</td>
                 <td className="px-3 py-2">{formatMoney(n.revenueCents / 100)}</td>
@@ -212,7 +212,7 @@ async function Scorecard() {
       <TableWrap>
         <table className="min-w-full text-sm">
           <thead>
-            <tr className="border-b border-slate-100 text-left text-xs uppercase tracking-wide text-slate-500">
+            <tr className="border-b border-edge-soft text-left text-xs uppercase tracking-wide text-ink-3">
               <th className="px-3 py-2 font-medium">Channel</th>
               <th className="px-3 py-2 font-medium">Leads</th>
               <th className="px-3 py-2 font-medium">Booked</th>
@@ -225,7 +225,7 @@ async function Scorecard() {
           </thead>
           <tbody>
             {data.channels.map((c) => (
-              <tr key={c.channel} className="border-b border-slate-50">
+              <tr key={c.channel} className="border-b border-edge-soft">
                 <td className="px-3 py-2 font-medium">{c.channel}</td>
                 <td className="px-3 py-2">{c.leads}</td>
                 <td className="px-3 py-2">{c.won}</td>
@@ -258,25 +258,25 @@ async function BidPipelineBoard() {
     <Card title={`Bid pipeline — ${data.pipeline.length} in play`}>
       <div className="space-y-4">
         {data.pipeline.map((p) => (
-          <div key={p.id} className="rounded-lg border border-slate-100 p-3">
+          <div key={p.id} className="rounded-lg border border-edge-soft p-3">
             <div className="flex flex-wrap items-start justify-between gap-2">
               <div className="max-w-xl">
-                <span className={`mr-2 inline-block rounded px-1.5 py-0.5 text-xs font-semibold uppercase ${p.pipeline_state === 'submitted' ? 'bg-blue-100 text-blue-800' : 'bg-emerald-100 text-emerald-800'}`}>{p.pipeline_state}</span>
-                {p.url ? <a className="font-medium text-blue-700 hover:underline" href={p.url} target="_blank" rel="noreferrer">{p.title}</a> : <span className="font-medium">{p.title}</span>}
-                <div className="text-xs text-slate-500">
+                <span className={`mr-2 inline-block rounded px-1.5 py-0.5 text-xs font-semibold uppercase ${p.pipeline_state === 'submitted' ? 'bg-sky-400/10 ring-1 ring-inset ring-sky-400/20 text-sky-300' : 'bg-emerald-400/10 ring-1 ring-inset ring-emerald-400/20 text-emerald-300'}`}>{p.pipeline_state}</span>
+                {p.url ? <a className="font-medium text-sky-300 hover:underline" href={p.url} target="_blank" rel="noreferrer">{p.title}</a> : <span className="font-medium">{p.title}</span>}
+                <div className="text-xs text-ink-3">
                   {p.agency}{p.sol_number ? ` · ${p.sol_number}` : ''}{p.place ? ` · ${p.place}` : ''}
                   {p.poc?.email ? ` · CO: ${p.poc.name ?? ''} <${p.poc.email}>` : ''}
                 </div>
               </div>
               <div className="text-right">
-                <div className={`text-lg font-semibold ${daysLeft(p.deadline_at) !== 'past' && parseInt(daysLeft(p.deadline_at)) <= 5 ? 'text-red-600' : 'text-slate-700'}`}>{daysLeft(p.deadline_at)}</div>
-                <div className="text-xs text-slate-400">to deadline</div>
+                <div className={`text-lg font-semibold ${daysLeft(p.deadline_at) !== 'past' && parseInt(daysLeft(p.deadline_at)) <= 5 ? 'text-bad' : 'text-ink-2'}`}>{daysLeft(p.deadline_at)}</div>
+                <div className="text-xs text-ink-4">to deadline</div>
               </div>
             </div>
             {(p.log ?? []).length > 0 && (
-              <ul className="mt-2 space-y-0.5 border-l-2 border-slate-100 pl-3 text-xs text-slate-600">
+              <ul className="mt-2 space-y-0.5 border-l-2 border-edge-soft pl-3 text-xs text-ink-2">
                 {(p.log ?? []).slice(-5).map((e, i) => (
-                  <li key={i}><span className="text-slate-400">{formatDate(e.at)} · </span>{e.text}</li>
+                  <li key={i}><span className="text-ink-4">{formatDate(e.at)} · </span>{e.text}</li>
                 ))}
               </ul>
             )}
