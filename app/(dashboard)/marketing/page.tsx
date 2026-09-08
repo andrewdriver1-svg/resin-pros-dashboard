@@ -4,7 +4,8 @@ import { getGoogleBusinessSnapshot } from '@/lib/db';
 import { formatMoney, formatDate } from '@/app/components/format';
 import { PageHeader, Card, StatGrid, StatTile, TableWrap } from '@/app/components/ui';
 import { EmptyState, StatGridSkeleton, TableSkeleton } from '@/app/components/states';
-import { getBidShortlist, getRevenueHeatmap, getScorecard, guerrillaConfigured } from '@/lib/guerrilla/client';
+import { getBidPipeline, getBidShortlist, getRevenueHeatmap, getScorecard, guerrillaConfigured } from '@/lib/guerrilla/client';
+import { BidControls, PursuitControls } from '@/app/components/BidControls';
 import { PastJobForm } from '@/app/components/PastJobForm';
 
 export const dynamic = 'force-dynamic';
@@ -24,6 +25,9 @@ export default function MarketingPage() {
       </Suspense>
       <Suspense fallback={<TableSkeleton rows={5} />}>
         <Scorecard />
+      </Suspense>
+      <Suspense fallback={<TableSkeleton rows={5} />}>
+        <BidPipelineBoard />
       </Suspense>
       <Suspense fallback={<TableSkeleton rows={5} />}>
         <BidRadar />
@@ -128,16 +132,22 @@ async function BidRadar() {
         <table className="min-w-full text-sm">
           <thead>
             <tr className="border-b border-slate-100 text-left text-xs uppercase tracking-wide text-slate-500">
+              <th className="px-3 py-2 font-medium">Score</th>
               <th className="px-3 py-2 font-medium">Deadline</th>
               <th className="px-3 py-2 font-medium">Opportunity</th>
               <th className="px-3 py-2 font-medium">Place</th>
               <th className="px-3 py-2 font-medium">Miles</th>
-              <th className="px-3 py-2 font-medium">Set-aside</th>
+              <th className="px-3 py-2 font-medium">Actions</th>
             </tr>
           </thead>
           <tbody>
             {data.shortlist.map((b) => (
-              <tr key={b.external_id} className="border-b border-slate-50">
+              <tr key={b.external_id} className="border-b border-slate-50 align-top">
+                <td className="whitespace-nowrap px-3 py-2">
+                  <span className={`inline-block rounded px-1.5 py-0.5 text-xs font-semibold ${Number(b.go_no_go_score) >= 70 ? 'bg-emerald-100 text-emerald-800' : Number(b.go_no_go_score) >= 45 ? 'bg-amber-100 text-amber-800' : 'bg-slate-100 text-slate-600'}`}>
+                    {b.go_no_go_score ? Math.round(Number(b.go_no_go_score)) : '—'}
+                  </span>
+                </td>
                 <td className="whitespace-nowrap px-3 py-2">{formatDate(b.deadline_at)}</td>
                 <td className="max-w-md px-3 py-2">
                   {b.url ? (
@@ -147,11 +157,11 @@ async function BidRadar() {
                   ) : (
                     b.title
                   )}
-                  <div className="text-xs text-slate-500">{b.agency}</div>
+                  <div className="text-xs text-slate-500">{b.agency}{b.sol_number ? ` · ${b.sol_number}` : ''}</div>
                 </td>
                 <td className="whitespace-nowrap px-3 py-2">{b.place ?? '—'}</td>
                 <td className="whitespace-nowrap px-3 py-2">{b.distance_miles ? Math.round(Number(b.distance_miles)) : '—'}</td>
-                <td className="whitespace-nowrap px-3 py-2 text-xs">{b.set_aside ?? '—'}</td>
+                <td className="px-3 py-2"><BidControls noticeId={b.id} hasPoc={b.has_poc} /></td>
               </tr>
             ))}
           </tbody>
@@ -229,6 +239,51 @@ async function Scorecard() {
           </tbody>
         </table>
       </TableWrap>
+    </Card>
+  );
+}
+
+
+function daysLeft(iso: string | null): string {
+  if (!iso) return '—';
+  const d = Math.ceil((new Date(iso).getTime() - Date.now()) / 864e5);
+  return d < 0 ? 'past' : `${d}d`;
+}
+
+async function BidPipelineBoard() {
+  if (!guerrillaConfigured()) return null;
+  const data = await getBidPipeline();
+  if (!data || data.pipeline.length === 0) return null;
+  return (
+    <Card title={`Bid pipeline — ${data.pipeline.length} in play`}>
+      <div className="space-y-4">
+        {data.pipeline.map((p) => (
+          <div key={p.id} className="rounded-lg border border-slate-100 p-3">
+            <div className="flex flex-wrap items-start justify-between gap-2">
+              <div className="max-w-xl">
+                <span className={`mr-2 inline-block rounded px-1.5 py-0.5 text-xs font-semibold uppercase ${p.pipeline_state === 'submitted' ? 'bg-blue-100 text-blue-800' : 'bg-emerald-100 text-emerald-800'}`}>{p.pipeline_state}</span>
+                {p.url ? <a className="font-medium text-blue-700 hover:underline" href={p.url} target="_blank" rel="noreferrer">{p.title}</a> : <span className="font-medium">{p.title}</span>}
+                <div className="text-xs text-slate-500">
+                  {p.agency}{p.sol_number ? ` · ${p.sol_number}` : ''}{p.place ? ` · ${p.place}` : ''}
+                  {p.poc?.email ? ` · CO: ${p.poc.name ?? ''} <${p.poc.email}>` : ''}
+                </div>
+              </div>
+              <div className="text-right">
+                <div className={`text-lg font-semibold ${daysLeft(p.deadline_at) !== 'past' && parseInt(daysLeft(p.deadline_at)) <= 5 ? 'text-red-600' : 'text-slate-700'}`}>{daysLeft(p.deadline_at)}</div>
+                <div className="text-xs text-slate-400">to deadline</div>
+              </div>
+            </div>
+            {(p.log ?? []).length > 0 && (
+              <ul className="mt-2 space-y-0.5 border-l-2 border-slate-100 pl-3 text-xs text-slate-600">
+                {(p.log ?? []).slice(-5).map((e, i) => (
+                  <li key={i}><span className="text-slate-400">{formatDate(e.at)} · </span>{e.text}</li>
+                ))}
+              </ul>
+            )}
+            <PursuitControls noticeId={p.id} />
+          </div>
+        ))}
+      </div>
     </Card>
   );
 }

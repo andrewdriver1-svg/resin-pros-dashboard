@@ -14,7 +14,11 @@ export type HeatmapNeighborhood = {
 };
 
 export type BidNotice = {
+  id: string;
   external_id: string;
+  go_no_go_score: string | null;
+  sol_number: string | null;
+  has_poc: boolean;
   title: string;
   agency: string | null;
   place: string | null;
@@ -71,4 +75,36 @@ export type ScorecardChannel = {
 
 export function getScorecard() {
   return fetchMachine<{ from: string; to: string; channels: ScorecardChannel[] }>("/api/scorecard");
+}
+
+export type PipelineRow = {
+  id: string; title: string; agency: string | null; place: string | null;
+  sol_number: string | null; url: string | null;
+  poc: { name?: string; email?: string; phone?: string } | null;
+  deadline_at: string | null; distance_miles: string | null;
+  go_no_go_score: string | null; pipeline_state: string;
+  log: Array<{ at: string; kind: string; text: string }> | null;
+  submitted_at: string | null;
+};
+
+export function getBidPipeline() {
+  return fetchMachine<{ pipeline: PipelineRow[]; pendingAsks: unknown[] }>("/api/bids/pipeline");
+}
+
+export async function postBidAction(
+  noticeId: string,
+  action: "pursue" | "pass" | "submitted" | "won" | "lost" | "note" | "draft_ask",
+  note?: string,
+): Promise<{ ok: boolean; draft?: { subject: string; body: string; to: string | null } } | null> {
+  if (!guerrillaConfigured()) return null;
+  try {
+    const res = await fetch(`${process.env.GUERRILLA_API_URL}/api/bids/action`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json", Authorization: `Bearer ${process.env.GUERRILLA_API_KEY}` },
+      body: JSON.stringify({ noticeId, action, note }),
+      cache: "no-store",
+    });
+    if (!res.ok) return null;
+    return (await res.json()) as { ok: boolean; draft?: { subject: string; body: string; to: string | null } };
+  } catch { return null; }
 }

@@ -37,3 +37,21 @@ export async function addPastJob(formData: FormData): Promise<AddPastJobResult> 
   const data = (await res.json()) as { geocoded: boolean; matchedAddress: string | null };
   return { ok: true, geocoded: data.geocoded, matchedAddress: data.matchedAddress };
 }
+
+import { postBidAction } from "@/lib/guerrilla/client";
+import { revalidatePath } from "next/cache";
+
+export type BidActionResult =
+  | { ok: true; draft?: { subject: string; body: string; to: string | null } }
+  | { ok: false; error: string };
+
+export async function bidAction(
+  noticeId: string,
+  action: "pursue" | "pass" | "submitted" | "won" | "lost" | "note" | "draft_ask",
+  note?: string,
+): Promise<BidActionResult> {
+  const r = await postBidAction(noticeId, action, note);
+  if (!r?.ok) return { ok: false, error: "Machine did not accept the action" };
+  revalidatePath("/marketing");
+  return { ok: true, draft: r.draft };
+}
