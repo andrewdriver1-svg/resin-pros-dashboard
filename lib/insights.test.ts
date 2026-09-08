@@ -205,3 +205,64 @@ describe('computeAttention', () => {
     expect(items).toEqual([]);
   });
 });
+
+describe('adjusted pipeline (quote reviews)', () => {
+  it('subtracts dead-classified quotes from adjusted, never from raw', () => {
+    const reviews = new Map([
+      ['a', { quoteId: 'a', classification: 'likely_dead' as const, reviewedAt: '2026-09-01' }],
+      ['b', { quoteId: 'b', classification: 'follow_up' as const, reviewedAt: '2026-09-01' }],
+    ]);
+    const k = computeKpis(
+      {
+        ...empty,
+        quotes: [
+          quote({ id: 'a', amount: 100_000 }),
+          quote({ id: 'b', amount: 50_000 }),
+          quote({ id: 'c', amount: 25_000 }), // unreviewed
+        ],
+        quoteReviews: reviews,
+      },
+      NOW,
+    );
+    expect(k.pipelineValue).toBe(175_000); // raw untouched
+    expect(k.adjustedPipeline).toBe(75_000);
+    expect(k.adjustedCount).toBe(2);
+    expect(k.unreviewedPipeline).toBe(25_000);
+    expect(k.weightedPipeline).toBe(75_000 * PIPELINE_WEIGHT);
+  });
+});
+
+describe('attention states', () => {
+  const base = {
+    jobs: [],
+    quotes: [quote({ id: 'q', issuedAt: '2026-08-01', amount: 20_000 })],
+    invoices: [inv({ id: 'i', amount: 4000, dueAt: '2026-08-30' })],
+    leads: [],
+    todos: [],
+  };
+
+  it('hides resolved and unexpired-snoozed items; keeps acknowledged (muted, sunk)', () => {
+    const states = new Map([
+      ['inv-i', { itemKey: 'inv-i', state: 'resolved' as const, updatedAt: '2026-09-01' }],
+      ['quote-q', { itemKey: 'quote-q', state: 'acknowledged' as const, updatedAt: '2026-09-01' }],
+    ]);
+    const items = computeAttention({ ...base, attentionStates: states }, NOW);
+    expect(items.map((i) => i.id)).toEqual(['quote-q']);
+    expect(items[0].acknowledged).toBe(true);
+  });
+
+  it('a snooze that has expired no longer hides the item', () => {
+    const states = new Map([
+      ['quote-q', { itemKey: 'quote-q', state: 'snoozed' as const, snoozedUntil: '2026-09-07T00:00:00Z', updatedAt: '2026-09-01' }],
+    ]);
+    const items = computeAttention({ ...base, attentionStates: states }, NOW);
+    expect(items.some((i) => i.id === 'quote-q')).toBe(true);
+  });
+
+  it('items carry a follow-up prefill for one-click task creation', () => {
+    const items = computeAttention(base, NOW);
+    const q = items.find((i) => i.id === 'quote-q')!;
+    expect(q.followUp?.entityType).toBe('quote');
+    expect(q.followUp?.entityId).toBe('q');
+  });
+});

@@ -92,8 +92,28 @@ const view = (id: string, label: string, href: string, icon: string, keywords: s
   mutates: false,
 });
 
+const action = (id: string, label: string, icon: string, keywords: string[], hint?: string): Command => ({
+  id: `action:${id}`,
+  kind: 'action',
+  label,
+  category: 'Actions',
+  keywords,
+  icon,
+  href: '#',
+  hint,
+  // These OPEN a form; the actual write happens in the audited server action
+  // after the user submits — so the command itself does not mutate.
+  mutates: false,
+});
+
 export const STATIC_COMMANDS: Command[] = [
-  nav('today', 'Go to Today', '/', 'today', ['home', 'dashboard', 'command center', 'overview']),
+  action('new-task', 'Create task', 'check', ['todo', 'add task', 'new task', 'remind'], 'Opens the quick task form'),
+  action('new-event', 'Add calendar event', 'calendar', ['personal event', 'appointment', 'meeting', 'schedule'], 'Opens the quick event form'),
+
+  nav('today', 'Go to Today', '/', 'today', ['home', 'my day', 'workspace', 'overview']),
+  nav('todo', 'Go to To Do', '/todo', 'check', ['tasks', 'task list', 'checklist']),
+  nav('calendar', 'Go to Calendar', '/calendar', 'calendar', ['schedule', 'week', 'month', 'events']),
+  nav('company', 'Go to Command Center', '/company', 'pulse', ['dashboard', 'kpi', 'business', 'pulse', 'attention']),
   nav('leads', 'Go to Leads', '/leads', 'leads', ['prospects', 'requests', 'opportunities']),
   nav('jobs', 'Go to Jobs', '/jobs', 'jobs', ['work', 'projects', 'schedule']),
   nav('quotes', 'Go to Quotes & Invoices', '/quotes', 'quotes', ['estimates', 'proposals', 'invoices', 'billing', 'ar']),
@@ -107,6 +127,10 @@ export const STATIC_COMMANDS: Command[] = [
   view('leads-attention', 'Show leads needing attention', '/leads?view=attention', 'leads', ['cold', 'uncontacted', 'follow up'], 'New leads with no first contact in 3+ days'),
   view('scheduled-jobs', 'Show scheduled jobs', '/jobs?status=scheduled', 'jobs', ['upcoming', 'booked', 'calendar'], undefined),
   view('jobs-in-progress', 'Show jobs in progress', '/jobs?status=in_progress', 'jobs', ['active', 'working', 'current'], undefined),
+  view('tasks-today', 'Tasks due today', '/todo?filter=today', 'check', ['due', 'today', 'my tasks'], undefined),
+  view('tasks-overdue', 'Overdue tasks', '/todo?filter=overdue', 'check', ['late', 'past due tasks'], undefined),
+  view('job-tasks', 'Job tasks', '/todo?filter=job', 'check', ['linked tasks'], undefined),
+  view('pipeline-review', 'Review stale pipeline', '/quotes?view=stale', 'quotes', ['cleanup', 'classify', 'dead quotes'], 'Classify open quotes: active / follow up / dead'),
 ];
 
 // ── record index (built server-side, searched client-side) ───────────────────
@@ -308,6 +332,7 @@ function matchOne(command: Command, rest: string, money: MoneyQuery | null): num
 }
 
 const CATEGORY_ORDER: CommandCategory[] = [
+  'Actions',
   'Navigation',
   'Views',
   'Leads',
@@ -315,7 +340,6 @@ const CATEGORY_ORDER: CommandCategory[] = [
   'Quotes',
   'Invoices',
   'Transactions',
-  'Actions',
 ];
 
 export interface CommandGroup {

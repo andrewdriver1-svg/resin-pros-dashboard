@@ -9,7 +9,16 @@
  */
 
 import { businessConfig } from '@/config/business.config';
-import type { Invoice, Job, Lead, MaterialTodo, Quote, Transaction } from '@/lib/db/types';
+import type {
+  AttentionStateRecord,
+  Invoice,
+  Job,
+  Lead,
+  MaterialTodo,
+  Quote,
+  QuoteReviewRecord,
+  Transaction,
+} from '@/lib/db/types';
 
 const TZ = businessConfig.contact.timezone;
 const DAY_MS = 86_400_000;
@@ -60,8 +69,17 @@ export interface KpiSummary {
   invoicedPrevPace: number;
   invoicedYtd: number;
   collectedMtd: number;
+  /** RAW open pipeline — exactly what Jobber reports. Never silently adjusted. */
   pipelineValue: number;
   pipelineCount: number;
+  /**
+   * Adjusted pipeline: raw minus quotes internally classified likely_dead /
+   * known_lost. Source truth (Jobber) is preserved in pipelineValue.
+   */
+  adjustedPipeline: number;
+  adjustedCount: number;
+  /** Open value awaiting internal review (no classification yet). */
+  unreviewedPipeline: number;
   weightedPipeline: number;
   arOutstanding: number;
   arOverdue: number;
@@ -93,6 +111,8 @@ export function computeKpis(
     invoices: Invoice[];
     leads: Lead[];
     transactions: Transaction[];
+    /** Internal pipeline-review classifications, keyed by quote id. */
+    quoteReviews?: Map<string, QuoteReviewRecord>;
   },
   now: Date = new Date(),
 ): KpiSummary {
@@ -130,6 +150,14 @@ export function computeKpis(
   const openQuotes = data.quotes.filter((q) => q.status === 'awaiting_response');
   const pipelineValue = openQuotes.reduce((s, q) => s + q.amount, 0);
 
+  const reviews = data.quoteReviews ?? new Map<string, QuoteReviewRecord>();
+  const DEAD = new Set(['likely_dead', 'known_lost']);
+  const aliveQuotes = openQuotes.filter((q) => !DEAD.has(reviews.get(q.id)?.classification ?? ''));
+  const adjustedPipeline = aliveQuotes.reduce((s, q) => s + q.amount, 0);
+  const unreviewedPipeline = openQuotes
+    .filter((q) => !reviews.has(q.id))
+    .reduce((s, q) => s + q.amount, 0);
+
   const active = data.jobs.filter((j) => j.status === 'in_progress' || j.status === 'scheduled');
 
   let spendMtd = 0;
@@ -144,7 +172,11 @@ export function computeKpis(
     collectedMtd,
     pipelineValue,
     pipelineCount: openQuotes.length,
-    weightedPipeline: pipelineValue * PIPELINE_WEIGHT,
+    adjustedPipeline,
+    adjustedCount: aliveQuotes.length,
+    unreviewedPipeline,
+    // Weighted on the ADJUSTED number — dead deals shouldn't inflate planning.
+    weightedPipeline: adjustedPipeline * PIPELINE_WEIGHT,
     arOutstanding,
     arOverdue,
     arOverdueCount,
@@ -313,6 +345,10 @@ export interface AttentionItem {
   linkLabel: string;
   /** Dollar stake, for ordering. */
   value: number;
+  /** Seen-but-not-fixed: stays visible, rendered muted. */
+  acknowledged?: boolean;
+  /** Prefill for one-click "create follow-up task". */
+  followUp?: { title: string; entityType: 'job' | 'quote' | 'invoice' | 'lead'; entityId: string };
 }
 
 export function computeAttention(
@@ -322,6 +358,8 @@ export function computeAttention(
     invoices: Invoice[];
     leads: Lead[];
     todos: MaterialTodo[];
+    /** Internal ack/snooze/resolve states, keyed by item id. */
+    attentionStates?: Map<string, AttentionStateRecord>;
   },
   now: Date = new Date(),
 ): AttentionItem[] {
@@ -340,6 +378,7 @@ export function computeAttention(
       href: inv.number ? `/quotes?q=${encodeURIComponent(inv.number)}` : '/quotes?view=overdue',
       linkLabel: 'View invoice',
       value: bal,
+      followUp: { title: `Collect ${inv.number || 'invoice'} — ${money(bal)} (${inv.clientName})`, entityType: 'invoice', entityId: inv.id },
     });
   }
 
@@ -355,6 +394,7 @@ export function computeAttention(
       href: q.number ? `/quotes?q=${encodeURIComponent(q.number)}` : '/quotes?view=stale',
       linkLabel: 'View quote',
       value: q.amount,
+      followUp: { title: `Follow up Quote ${q.number} — ${q.clientName}`, entityType: 'quote', entityId: q.id },
     });
   }
 
@@ -370,6 +410,7 @@ export function computeAttention(
       href: `/leads?q=${encodeURIComponent(lead.clientName)}`,
       linkLabel: 'View lead',
       value: 0,
+      followUp: { title: `Contact lead: ${lead.clientName}`, entityType: 'lead', entityId: lead.id },
     });
   }
 
@@ -388,6 +429,7 @@ export function computeAttention(
       href: `/jobs/${job.id}`,
       linkLabel: 'View job',
       value: job.value,
+      followUp: { title: `Pre-start check: ${job.title}`, entityType: 'job', entityId: job.id },
     });
   }
 
@@ -406,8 +448,46 @@ export function computeAttention(
     });
   }
 
-  // High severity first, then the biggest dollars.
-  return items.sort((a, b) =>
-    a.severity !== b.severity ? (a.severity === 'high' ? -1 : 1) : b.value - a.value,
-  );
+  // Apply internal states: resolved disappears, unexpired snoozes hide, and
+  // acknowledged items stay visible but muted (seen ≠ fixed). Never touches
+  // the underlying Jobber records.
+  const states = data.attentionStates ?? new Map<string, AttentionStateRecord>();
+  const visible = items.filter((item) => {
+    const s = states.get(item.id);
+    if (!s) return true;
+    if (s.state === 'resolved') return false;
+    if (s.state === 'snoozed' && s.snoozedUntil && new Date(s.snoozedUntil).getTime() > nowMs) return false;
+    return true;
+  });
+  for (const item of visible) {
+    if (states.get(item.id)?.state === 'acknowledged') item.acknowledged = true;
+  }
+
+  // High severity first, then the biggest dollars; acknowledged sink.
+  return visible.sort((a, b) => {
+    if (Boolean(a.acknowledged) !== Boolean(b.acknowledged)) return a.acknowledged ? 1 : -1;
+    return a.severity !== b.severity ? (a.severity === 'high' ? -1 : 1) : b.value - a.value;
+  });
+}
+
+// ── executive status narrative (deterministic; Claude takes over in Phase D) ─
+
+export interface BusinessStatus {
+  level: Health;
+  headline: string;
+  detail: string;
+}
+
+/** One honest sentence about the company's state, from the worst pulse signal. */
+export function computeBusinessStatus(signals: PulseSignal[]): BusinessStatus {
+  const worst =
+    signals.find((s) => s.health === 'attention') ?? signals.find((s) => s.health === 'watch');
+  if (!worst) {
+    return { level: 'healthy', headline: 'All systems steady', detail: 'No signals need attention right now.' };
+  }
+  return {
+    level: worst.health,
+    headline: worst.health === 'attention' ? 'Attention required' : 'Worth watching',
+    detail: worst.detail,
+  };
 }
