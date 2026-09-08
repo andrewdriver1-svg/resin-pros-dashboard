@@ -5,6 +5,8 @@ import { usePathname } from 'next/navigation';
 import { useEffect, useRef, useState } from 'react';
 
 import { CommandPalette, OPEN_COMMAND_EVENT } from './CommandPalette';
+import { DrawerHost } from './DrawerHost';
+import { QuickCreate, type JobOption } from './QuickCreate';
 
 /**
  * Stroke SVG nav icons (18px grid): render identically on every platform,
@@ -75,6 +77,26 @@ export function NavIcon({ name }: { name: string }) {
           <circle cx="10" cy="16.5" r="0.9" fill="currentColor" stroke="none" />
         </svg>
       );
+    case 'check':
+      return (
+        <svg {...common}>
+          <circle cx="10" cy="10" r="7.5" />
+          <path d="m6.5 10.5 2.5 2.5 4.5-5" />
+        </svg>
+      );
+    case 'calendar':
+      return (
+        <svg {...common}>
+          <rect x="2.5" y="4" width="15" height="13" rx="1.5" />
+          <path d="M2.5 8h15M6.5 2.5V5M13.5 2.5V5" />
+        </svg>
+      );
+    case 'pulse':
+      return (
+        <svg {...common}>
+          <path d="M2.5 10.5h3l2-5 3 9 2-6.5 1.5 2.5h3.5" />
+        </svg>
+      );
     case 'search':
       return (
         <svg {...common}>
@@ -102,7 +124,12 @@ export function NavIcon({ name }: { name: string }) {
 const NAV_GROUPS: { label: string; items: { href: string; label: string; icon: string }[] }[] = [
   {
     label: 'Command',
-    items: [{ href: '/', label: 'Today', icon: 'today' }],
+    items: [
+      { href: '/', label: 'Today', icon: 'today' },
+      { href: '/todo', label: 'To Do', icon: 'check' },
+      { href: '/calendar', label: 'Calendar', icon: 'calendar' },
+      { href: '/company', label: 'Command Center', icon: 'pulse' },
+    ],
   },
   {
     label: 'Sales',
@@ -184,10 +211,13 @@ export function Shell({
   brand,
   footer,
   children,
+  jobOptions = [],
 }: {
   brand: React.ReactNode;
   footer: React.ReactNode;
   children: React.ReactNode;
+  /** Synced jobs for the quick-create "link to job" search. */
+  jobOptions?: JobOption[];
 }) {
   const pathname = usePathname();
   const [open, setOpen] = useState(false);
@@ -320,6 +350,8 @@ export function Shell({
       </main>
 
       <CommandPalette />
+      <QuickCreate jobOptions={jobOptions} />
+      <DrawerHost />
     </div>
   );
 }

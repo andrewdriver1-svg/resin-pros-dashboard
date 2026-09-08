@@ -18,8 +18,10 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { fetchCommandIndex } from '@/lib/actions/command-index';
 import { searchCommands, STATIC_COMMANDS, type Command, type CommandGroup } from '@/lib/command';
+import { parseQuickTask } from '@/lib/tasks';
 import { formatMoney, humanizeStatus, relativeTime, statusTone } from './format';
 import { NavIcon } from './shell';
+import { openEventForm, openTaskForm } from './os-events';
 
 /** Anything can open the palette by dispatching this event (mobile button, future "Ask Claude" affordances). */
 export const OPEN_COMMAND_EVENT = 'rp:open-command';
@@ -115,11 +117,43 @@ export function CommandPalette() {
     };
   }, [open]);
 
+  // Quick entry: "task order material friday" → one-keystroke task creation.
+  const quickTaskRef = useRef<{ title: string; dueDate?: string } | null>(null);
+
   // Result groups for the current query.
   const groups: CommandGroup[] = useMemo(() => {
     if (!open) return [];
     const all = [...STATIC_COMMANDS, ...(indexRef.current ?? [])];
-    if (query.trim()) return searchCommands(query, all, { perGroup: 5 });
+    if (query.trim()) {
+      const out = searchCommands(query, all, { perGroup: 5 });
+      const quick = query.match(/^(?:task|todo)\s+(.+)/i);
+      if (quick) {
+        const parsed = parseQuickTask(quick[1]);
+        quickTaskRef.current = parsed;
+        out.unshift({
+          category: 'Actions',
+          items: [
+            {
+              command: {
+                id: 'quick:task',
+                kind: 'action',
+                label: `Create task: “${parsed.title}”`,
+                category: 'Actions',
+                keywords: [],
+                icon: 'check',
+                href: '#',
+                hint: parsed.dueDate ? `Due ${parsed.dueDate}` : 'No date — set one in the form',
+                mutates: false,
+              },
+              score: 999,
+            },
+          ],
+        });
+      } else {
+        quickTaskRef.current = null;
+      }
+      return out;
+    }
 
     // Empty query: recents (if any) + navigation.
     const out: CommandGroup[] = [];
@@ -152,8 +186,23 @@ export function CommandPalette() {
 
   const execute = useCallback(
     (command: Command) => {
-      saveRecent(command);
       close();
+      // Action commands open the quick-create forms instead of navigating; the
+      // real write happens in the audited server action on submit.
+      if (command.kind === 'action') {
+        if (command.id === 'quick:task') {
+          const parsed = quickTaskRef.current;
+          openTaskForm(parsed ? { title: parsed.title, dueDate: parsed.dueDate } : {});
+        } else if (command.id === 'action:new-task') {
+          saveRecent(command);
+          openTaskForm();
+        } else if (command.id === 'action:new-event') {
+          saveRecent(command);
+          openEventForm();
+        }
+        return;
+      }
+      saveRecent(command);
       router.push(command.href);
     },
     [close, router],
