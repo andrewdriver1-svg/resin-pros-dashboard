@@ -337,8 +337,8 @@ export function computeAttention(
       severity: 'high',
       title: `Invoice ${inv.number || '—'} · ${money(bal)} overdue`,
       detail: `${inv.clientName}${days != null && days > 0 ? ` — due ${days} day${days === 1 ? '' : 's'} ago` : ''}.`,
-      href: '/quotes',
-      linkLabel: 'View invoices',
+      href: inv.number ? `/quotes?q=${encodeURIComponent(inv.number)}` : '/quotes?view=overdue',
+      linkLabel: 'View invoice',
       value: bal,
     });
   }
@@ -352,8 +352,8 @@ export function computeAttention(
       severity: q.amount >= 10_000 ? 'high' : 'medium',
       title: `Quote ${q.number || '—'} · ${money(q.amount)}`,
       detail: `${q.clientName} — no response for ${days} days. Worth a follow-up call.`,
-      href: '/quotes',
-      linkLabel: 'View quotes',
+      href: q.number ? `/quotes?q=${encodeURIComponent(q.number)}` : '/quotes?view=stale',
+      linkLabel: 'View quote',
       value: q.amount,
     });
   }
@@ -367,8 +367,8 @@ export function computeAttention(
       severity: days >= 7 ? 'high' : 'medium',
       title: `Lead: ${lead.clientName}`,
       detail: `Waiting ${days} days for first contact.`,
-      href: '/leads',
-      linkLabel: 'View leads',
+      href: `/leads?q=${encodeURIComponent(lead.clientName)}`,
+      linkLabel: 'View lead',
       value: 0,
     });
   }
