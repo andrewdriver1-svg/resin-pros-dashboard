@@ -153,3 +153,42 @@ export interface Transaction {
   jobId?: string;
   source: string;
 }
+
+// ── Phase C: internal operating records ──────────────────────────────────────
+
+export interface NoteRecord {
+  id: string;
+  entityType: 'job' | 'quote' | 'invoice' | 'lead' | 'task';
+  entityId: string;
+  body: string;
+  createdBy?: string;
+  createdAt: string;
+}
+
+export interface ActivityEntry {
+  id: string;
+  actor: 'human' | 'system' | 'claude' | 'automation';
+  verb: string;
+  entityType?: string;
+  entityId?: string;
+  summary: string;
+  createdAt: string;
+}
+
+export type AttentionState = 'open' | 'acknowledged' | 'snoozed' | 'resolved';
+
+export interface AttentionStateRecord {
+  itemKey: string;
+  state: AttentionState;
+  snoozedUntil?: string;
+  updatedAt: string;
+}
+
+export type QuoteClassification = 'active' | 'follow_up' | 'likely_dead' | 'known_lost' | 'needs_research';
+
+export interface QuoteReviewRecord {
+  quoteId: string;
+  classification: QuoteClassification;
+  note?: string;
+  reviewedAt: string;
+}

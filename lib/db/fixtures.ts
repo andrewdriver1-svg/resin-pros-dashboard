@@ -129,3 +129,31 @@ export const fixtureGoogleBusiness: GoogleBusinessSnapshot = {
   instagramFollowers: 13513,
   updatedAt: '2026-08-11T00:00:00.000Z',
 };
+
+// ── Phase C fixtures: tasks, calendar, activity ──────────────────────────────
+// Dev/demo only — production NEVER falls back to these for write-layer tables.
+import type { Task } from '@/lib/tasks';
+import type { CalendarEvent } from '@/lib/calendar';
+import type { ActivityEntry, NoteRecord } from './types';
+
+export const fixtureTasks: Task[] = [
+  { id: 'task-1', title: 'Confirm coating color with customer', status: 'open', priority: 'high', dueDate: '2026-09-08', dueAt: '2026-09-08T18:00:00Z', entityType: 'job', entityId: 'job-1001', entityLabel: 'Warehouse epoxy floor — 12,000 sqft', isPersonal: false, source: 'manual', createdAt: '2026-09-05T12:00:00Z', updatedAt: '2026-09-05T12:00:00Z' },
+  { id: 'task-2', title: 'Review Google Ads campaign', status: 'open', priority: 'normal', dueDate: '2026-09-09', isPersonal: false, source: 'manual', createdAt: '2026-09-06T12:00:00Z', updatedAt: '2026-09-06T12:00:00Z' },
+  { id: 'task-3', title: 'Order grinder diamonds', status: 'open', priority: 'urgent', dueDate: '2026-09-05', isPersonal: false, source: 'manual', createdAt: '2026-09-01T12:00:00Z', updatedAt: '2026-09-01T12:00:00Z' },
+  { id: 'task-4', title: 'Call insurance agent', status: 'open', priority: 'low', isPersonal: false, source: 'manual', createdAt: '2026-09-02T12:00:00Z', updatedAt: '2026-09-02T12:00:00Z' },
+  { id: 'task-5', title: 'Send closeout documents', status: 'done', priority: 'normal', dueDate: '2026-09-04', entityType: 'job', entityId: 'job-1003', entityLabel: 'Commercial kitchen urethane cement', isPersonal: false, source: 'manual', completedAt: '2026-09-04T20:00:00Z', createdAt: '2026-09-01T12:00:00Z', updatedAt: '2026-09-04T20:00:00Z' },
+];
+
+export const fixtureCalendarEvents: CalendarEvent[] = [
+  { id: 'evt-1', title: 'Dentist', kind: 'personal', isPersonal: true, startsAt: '2026-09-08T14:30:00Z', endsAt: '2026-09-08T15:30:00Z', allDay: false, source: 'internal', createdAt: '2026-09-01T12:00:00Z' },
+  { id: 'evt-2', title: 'Meet accountant', kind: 'meeting', isPersonal: false, startsAt: '2026-09-10T18:00:00Z', endsAt: '2026-09-10T19:00:00Z', allDay: false, source: 'internal', createdAt: '2026-09-01T12:00:00Z' },
+];
+
+export const fixtureNotes: NoteRecord[] = [
+  { id: 'note-1', entityType: 'job', entityId: 'job-1001', body: 'GC wants the safety line striping quoted separately.', createdAt: '2026-09-03T15:00:00Z' },
+];
+
+export const fixtureActivity: ActivityEntry[] = [
+  { id: 'act-1', actor: 'human', verb: 'task.completed', entityType: 'job', entityId: 'job-1003', summary: 'Completed “Send closeout documents”', createdAt: '2026-09-04T20:00:00Z' },
+  { id: 'act-2', actor: 'system', verb: 'sync.jobber', summary: 'Jobber sync completed', createdAt: '2026-09-08T09:00:00Z' },
+];

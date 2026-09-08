@@ -13,17 +13,25 @@
 import { createSupabaseServerClient } from '@/lib/supabase/server';
 import { isSupabaseConfigured } from '@/lib/supabase/env';
 import {
+  fixtureActivity,
+  fixtureCalendarEvents,
   fixtureGoogleBusiness,
   fixtureInvoices,
   fixtureJobCosts,
   fixtureJobs,
   fixtureLeads,
   fixtureMarketing,
+  fixtureNotes,
   fixtureQuotes,
+  fixtureTasks,
   fixtureTodos,
   fixtureTransactions,
 } from './fixtures';
+import type { Task } from '@/lib/tasks';
+import type { CalendarEvent } from '@/lib/calendar';
 import type {
+  ActivityEntry,
+  AttentionStateRecord,
   GoogleBusinessSnapshot,
   Invoice,
   Job,
@@ -32,7 +40,9 @@ import type {
   Lead,
   MarketingEntry,
   MaterialTodo,
+  NoteRecord,
   Quote,
+  QuoteReviewRecord,
   Transaction,
 } from './types';
 
@@ -59,6 +69,42 @@ const bool = (v: unknown, fallback = false): boolean => (typeof v === 'boolean' 
  */
 const MAX_ROWS = 10_000;
 
+/**
+ * DATA TRUST (Phase C): in production (Supabase configured), a failed read
+ * NEVER falls back to fixtures — sample data must never masquerade as company
+ * data. Failures return an empty list and are recorded so the shell can show a
+ * degraded-data state. Fixtures serve only dev/e2e (Supabase not configured).
+ */
+interface TableHealth {
+  ok: boolean;
+  at: number;
+  error?: string;
+}
+const tableHealth = new Map<string, TableHealth>();
+
+function recordHealth(table: string, ok: boolean, error?: string) {
+  tableHealth.set(table, { ok, at: Date.now(), error });
+  if (!ok) console.error(`[db] ${table} read FAILED (${error}); serving empty, not fixtures.`);
+}
+
+/** Per-instance view of recent read failures, for the Systems indicator. */
+export function getTableHealth(): { table: string; ok: boolean; at: number; error?: string }[] {
+  return Array.from(tableHealth.entries()).map(([table, h]) => ({ table, ...h }));
+}
+
+/** Cheap connectivity probe: can we reach the database at all right now? */
+export async function probeDatabase(): Promise<{ ok: boolean; error?: string }> {
+  if (!isSupabaseConfigured()) return { ok: true }; // fixture/dev mode — nothing to probe
+  try {
+    const supabase = await createSupabaseServerClient();
+    const { error } = await supabase.from('businesses').select('id').limit(1);
+    if (error) return { ok: false, error: error.message };
+    return { ok: true };
+  } catch (err) {
+    return { ok: false, error: (err as Error).message };
+  }
+}
+
 async function readList<T>(opts: {
   table: string;
   map: (row: Row) => T;
@@ -72,14 +118,18 @@ async function readList<T>(opts: {
     if (opts.order) query = query.order(opts.order.column, { ascending: opts.order.ascending });
     const { data, error } = await query;
     if (error) {
-      console.warn(`[db] ${opts.table} read failed (${error.message}); using fixtures.`);
-      return opts.fixture;
+      recordHealth(opts.table, false, error.message);
+      return [];
     }
-    if (!Array.isArray(data)) return opts.fixture;
+    if (!Array.isArray(data)) {
+      recordHealth(opts.table, false, 'non-array response');
+      return [];
+    }
+    recordHealth(opts.table, true);
     return data.map((r) => opts.map(r as Row));
   } catch (err) {
-    console.warn(`[db] ${opts.table} read threw (${(err as Error).message}); using fixtures.`);
-    return opts.fixture;
+    recordHealth(opts.table, false, (err as Error).message);
+    return [];
   }
 }
 
@@ -285,4 +335,114 @@ export async function getGoogleBusinessSnapshot(): Promise<GoogleBusinessSnapsho
     console.warn(`[db] google_business_snapshot read threw (${(err as Error).message}); using fixture.`);
     return fixtureGoogleBusiness;
   }
+}
+
+// ── Phase C: internal operating reads ────────────────────────────────────────
+
+function rowToTask(r: Row): Task {
+  return {
+    id: str(r.id),
+    title: str(r.title, 'Untitled task'),
+    description: optStr(r.description),
+    status: str(r.status, 'open') as Task['status'],
+    priority: str(r.priority, 'normal') as Task['priority'],
+    dueDate: optStr(r.due_date),
+    dueAt: optStr(r.due_at),
+    entityType: optStr(r.entity_type) as Task['entityType'],
+    entityId: optStr(r.entity_id),
+    isPersonal: bool(r.is_personal),
+    source: str(r.source, 'manual') as Task['source'],
+    snoozedUntil: optStr(r.snoozed_until),
+    completedAt: optStr(r.completed_at),
+    createdAt: str(r.created_at),
+    updatedAt: str(r.updated_at),
+  };
+}
+
+function rowToCalendarEvent(r: Row): CalendarEvent {
+  return {
+    id: str(r.id),
+    title: str(r.title, 'Untitled event'),
+    description: optStr(r.description),
+    kind: str(r.kind, 'personal') as CalendarEvent['kind'],
+    isPersonal: bool(r.is_personal, true),
+    startsAt: str(r.starts_at),
+    endsAt: optStr(r.ends_at),
+    allDay: bool(r.all_day),
+    entityType: optStr(r.entity_type),
+    entityId: optStr(r.entity_id),
+    source: str(r.source, 'internal') as CalendarEvent['source'],
+    createdAt: str(r.created_at),
+  };
+}
+
+function rowToNote(r: Row): NoteRecord {
+  return {
+    id: str(r.id),
+    entityType: str(r.entity_type, 'job') as NoteRecord['entityType'],
+    entityId: str(r.entity_id),
+    body: str(r.body),
+    createdBy: optStr(r.created_by),
+    createdAt: str(r.created_at),
+  };
+}
+
+function rowToActivity(r: Row): ActivityEntry {
+  return {
+    id: str(r.id),
+    actor: str(r.actor, 'human') as ActivityEntry['actor'],
+    verb: str(r.verb),
+    entityType: optStr(r.entity_type),
+    entityId: optStr(r.entity_id),
+    summary: str(r.summary),
+    createdAt: str(r.created_at),
+  };
+}
+
+export function getTasks(): Promise<Task[]> {
+  return readList({ table: 'tasks', map: rowToTask, fixture: fixtureTasks, order: { column: 'created_at', ascending: false } });
+}
+
+export function getCalendarEvents(): Promise<CalendarEvent[]> {
+  return readList({ table: 'calendar_events', map: rowToCalendarEvent, fixture: fixtureCalendarEvents, order: { column: 'starts_at', ascending: true } });
+}
+
+export function getNotes(): Promise<NoteRecord[]> {
+  return readList({ table: 'notes', map: rowToNote, fixture: fixtureNotes, order: { column: 'created_at', ascending: false } });
+}
+
+/** Recent activity, newest first (capped — the feed is a pulse, not an archive). */
+export async function getActivity(limit = 30): Promise<ActivityEntry[]> {
+  const all = await readList({ table: 'activity_log', map: rowToActivity, fixture: fixtureActivity, order: { column: 'created_at', ascending: false } });
+  return all.slice(0, limit);
+}
+
+/** Attention item states, keyed by item id. Missing key = 'open'. */
+export async function getAttentionStates(): Promise<Map<string, AttentionStateRecord>> {
+  const rows = await readList<AttentionStateRecord>({
+    table: 'attention_states',
+    map: (r) => ({
+      itemKey: str(r.item_key),
+      state: str(r.state, 'open') as AttentionStateRecord['state'],
+      snoozedUntil: optStr(r.snoozed_until),
+      updatedAt: str(r.updated_at),
+    }),
+    fixture: [],
+  });
+  return new Map(rows.map((r) => [r.itemKey, r]));
+}
+
+/** Internal pipeline-review classifications, keyed by quote id. */
+export async function getQuoteReviews(): Promise<Map<string, QuoteReviewRecord>> {
+  const rows = await readList<QuoteReviewRecord>({
+    table: 'quote_reviews',
+    map: (r) => ({
+      quoteId: str(r.quote_id),
+      classification: str(r.classification, 'needs_research') as QuoteReviewRecord['classification'],
+      note: optStr(r.note),
+      reviewedAt: str(r.reviewed_at),
+    }),
+    fixture: [],
+  });
+  return new Map(rows.map((r) => [r.quoteId, r]));
 }
