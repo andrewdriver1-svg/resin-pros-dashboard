@@ -20,7 +20,7 @@ export default function SpendingPage() {
       </Suspense>
 
       <Card title="Import a bank / card statement">
-        <p className="mb-4 text-sm text-slate-500">
+        <p className="mb-4 text-sm text-ink-3">
           Upload a CSV export. Quoted fields, mixed date formats, and both amount sign conventions are
           handled; anything unparseable is reported line-by-line instead of imported blindly.
         </p>
@@ -78,23 +78,23 @@ async function ByAccount() {
       <TableWrap>
         <table className="min-w-full text-sm">
           <thead>
-            <tr className="border-b border-slate-100 text-left text-xs uppercase tracking-wide text-slate-500">
+            <tr className="border-b border-edge-soft text-left text-xs uppercase tracking-wide text-ink-3">
               <th className="px-3 py-2 font-medium">Account</th>
               <th className="px-3 py-2 font-medium">Type</th>
               <th className="px-3 py-2 text-right font-medium">Transactions</th>
               <th className="px-3 py-2 text-right font-medium">Spend</th>
             </tr>
           </thead>
-          <tbody className="divide-y divide-slate-100">
+          <tbody className="divide-y divide-edge-soft">
             {rows.map((r) => (
               <tr key={r.accountId ?? 'unassigned'}>
-                <td className="px-3 py-2.5 font-medium text-slate-900">
+                <td className="px-3 py-2.5 font-medium text-ink">
                   {r.label}
-                  {r.last4 && <span className="ml-1.5 text-xs font-normal text-slate-400">••{r.last4}</span>}
+                  {r.last4 && <span className="ml-1.5 text-xs font-normal text-ink-4">••{r.last4}</span>}
                 </td>
-                <td className="px-3 py-2.5 text-slate-600">{ACCOUNT_TYPE_LABEL[r.type] ?? r.type}</td>
-                <td className="whitespace-nowrap px-3 py-2.5 text-right text-slate-600">{r.count}</td>
-                <td className="whitespace-nowrap px-3 py-2.5 text-right font-medium text-slate-900">
+                <td className="px-3 py-2.5 text-ink-2">{ACCOUNT_TYPE_LABEL[r.type] ?? r.type}</td>
+                <td className="whitespace-nowrap px-3 py-2.5 text-right text-ink-2">{r.count}</td>
+                <td className="whitespace-nowrap px-3 py-2.5 text-right font-medium text-ink">
                   {formatMoney(r.total)}
                 </td>
               </tr>
@@ -113,14 +113,14 @@ async function ByCategory() {
       {rows.length === 0 ? (
         <EmptyState title="No spend yet" message="Sync QuickBooks, import a statement, or attribute costs to jobs to see this break down." />
       ) : (
-        <ul className="divide-y divide-slate-100">
+        <ul className="divide-y divide-edge-soft">
           {rows.map((r) => (
             <li key={r.categoryId} className="flex items-center justify-between py-2.5 text-sm">
-              <span className="text-slate-700">
+              <span className="text-ink-2">
                 {r.label}
-                {r.jobCost && <span className="ml-2 rounded bg-slate-100 px-1.5 py-0.5 text-xs text-slate-500">job cost</span>}
+                {r.jobCost && <span className="ml-2 rounded bg-panel-2 px-1.5 py-0.5 text-xs text-ink-3">job cost</span>}
               </span>
-              <span className="font-medium text-slate-900">{formatMoney(r.total)}</span>
+              <span className="font-medium text-ink">{formatMoney(r.total)}</span>
             </li>
           ))}
         </ul>
@@ -143,24 +143,24 @@ async function ByJob() {
         <TableWrap>
           <table className="min-w-full text-sm">
             <thead>
-              <tr className="border-b border-slate-100 text-left text-xs uppercase tracking-wide text-slate-500">
+              <tr className="border-b border-edge-soft text-left text-xs uppercase tracking-wide text-ink-3">
                 <th className="px-3 py-2 font-medium">Job</th>
                 <th className="px-3 py-2 text-right font-medium">Cost</th>
                 <th className="px-3 py-2 text-right font-medium">Margin</th>
               </tr>
             </thead>
-            <tbody className="divide-y divide-slate-100">
+            <tbody className="divide-y divide-edge-soft">
               {rollups.map((r) => (
                 <tr key={r.jobId}>
                   <td className="px-3 py-2.5">
-                    <Link href={`/jobs/${r.jobId}`} className="font-medium text-slate-900 hover:underline">
+                    <Link href={`/jobs/${r.jobId}`} className="font-medium text-ink hover:underline">
                       {r.title}
                     </Link>
                   </td>
-                  <td className="whitespace-nowrap px-3 py-2.5 text-right text-slate-700">{formatMoney(r.totalCost)}</td>
-                  <td className={`whitespace-nowrap px-3 py-2.5 text-right font-medium ${r.margin >= 0 ? 'text-emerald-700' : 'text-red-600'}`}>
+                  <td className="whitespace-nowrap px-3 py-2.5 text-right text-ink-2">{formatMoney(r.totalCost)}</td>
+                  <td className={`whitespace-nowrap px-3 py-2.5 text-right font-medium ${r.margin >= 0 ? 'text-emerald-300' : 'text-bad'}`}>
                     {formatMoney(r.margin)}
-                    {r.marginPct != null && <span className="ml-1 text-xs text-slate-400">({Math.round(r.marginPct * 100)}%)</span>}
+                    {r.marginPct != null && <span className="ml-1 text-xs text-ink-4">({Math.round(r.marginPct * 100)}%)</span>}
                   </td>
                 </tr>
               ))}
@@ -182,20 +182,20 @@ async function RecentTransactions() {
         <TableWrap>
           <table className="min-w-full text-sm">
             <thead>
-              <tr className="border-b border-slate-100 text-left text-xs uppercase tracking-wide text-slate-500">
+              <tr className="border-b border-edge-soft text-left text-xs uppercase tracking-wide text-ink-3">
                 <th className="px-3 py-2 font-medium">Date</th>
                 <th className="px-3 py-2 font-medium">Description</th>
                 <th className="px-3 py-2 font-medium">Category</th>
                 <th className="px-3 py-2 text-right font-medium">Amount</th>
               </tr>
             </thead>
-            <tbody className="divide-y divide-slate-100">
+            <tbody className="divide-y divide-edge-soft">
               {txns.map((t) => (
                 <tr key={t.id}>
-                  <td className="whitespace-nowrap px-3 py-2.5 text-slate-600">{formatDate(t.date)}</td>
-                  <td className="px-3 py-2.5 text-slate-800">{t.description}</td>
-                  <td className="px-3 py-2.5 text-slate-600">{getCategory(t.categoryId).label}</td>
-                  <td className="whitespace-nowrap px-3 py-2.5 text-right font-medium text-slate-900">{formatMoney(t.amount)}</td>
+                  <td className="whitespace-nowrap px-3 py-2.5 text-ink-2">{formatDate(t.date)}</td>
+                  <td className="px-3 py-2.5 text-ink">{t.description}</td>
+                  <td className="px-3 py-2.5 text-ink-2">{getCategory(t.categoryId).label}</td>
+                  <td className="whitespace-nowrap px-3 py-2.5 text-right font-medium text-ink">{formatMoney(t.amount)}</td>
                 </tr>
               ))}
             </tbody>
