@@ -1,8 +1,10 @@
 import { redirect } from 'next/navigation';
 import { businessConfig } from '@/config/business.config';
 import { getSessionState } from '@/lib/auth/session';
+import { getJobs } from '@/lib/db';
 import { Shell } from '@/app/components/shell';
 import { SignOutButton } from '@/app/components/SignOutButton';
+import { DataTrustBanner, SystemStatus } from '@/app/components/SystemStatus';
 
 function Brand({ subtitle }: { subtitle?: string }) {
   return (
@@ -30,22 +32,30 @@ export default async function DashboardLayout({ children }: { children: React.Re
     return <AccountNotLinked email={session.email} />;
   }
 
+  const jobs = await getJobs();
+  const jobOptions = jobs.map((j) => ({ id: j.id, title: j.title, clientName: j.clientName, status: j.status }));
+
   return (
-    <Shell
-      brand={<Brand subtitle={session.businessName ?? 'Operations'} />}
-      footer={
-        <div className="space-y-2">
-          {session.email && (
-            <div className="truncate px-3 text-xs text-ink-4" title={session.email}>
-              {session.email}
-            </div>
-          )}
-          {!session.fixtureMode && <SignOutButton />}
-        </div>
-      }
-    >
-      {children}
-    </Shell>
+    <>
+      <DataTrustBanner />
+      <Shell
+        jobOptions={jobOptions}
+        brand={<Brand subtitle={session.businessName ?? 'Operations'} />}
+        footer={
+          <div className="space-y-2">
+            <SystemStatus />
+            {session.email && (
+              <div className="truncate px-3 text-xs text-ink-4" title={session.email}>
+                {session.email}
+              </div>
+            )}
+            {!session.fixtureMode && <SignOutButton />}
+          </div>
+        }
+      >
+        {children}
+      </Shell>
+    </>
   );
 }
 
