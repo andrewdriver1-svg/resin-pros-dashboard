@@ -38,7 +38,7 @@ function OAuthNotice({ provider, code }: { provider: string; code: string | unde
     <div
       role="status"
       className={`rounded-lg border p-3 text-sm ${
-        m.ok ? 'border-emerald-200 bg-emerald-50 text-emerald-800' : 'border-amber-200 bg-amber-50 text-amber-800'
+        m.ok ? 'border-emerald-400/30 bg-emerald-400/10 text-emerald-300' : 'border-amber-400/30 bg-amber-400/10 text-amber-300'
       }`}
     >
       <span className="font-medium">{provider}:</span> {m.text}
@@ -66,7 +66,7 @@ export default async function SettingsPage({
           <Row label="Timezone" value={businessConfig.contact.timezone} />
           <Row label="Owners" value={businessConfig.owners.map((o) => o.name).join(', ')} />
         </dl>
-        <p className="mt-3 text-xs text-slate-400">Edit these in <code className="rounded bg-slate-100 px-1 py-0.5">config/business.config.ts</code>.</p>
+        <p className="mt-3 text-xs text-ink-4">Edit these in <code className="rounded bg-panel-2 px-1 py-0.5">config/business.config.ts</code>.</p>
       </Card>
 
       <Suspense fallback={<TableSkeleton rows={2} />}>
@@ -78,7 +78,7 @@ export default async function SettingsPage({
       </Suspense>
 
       <Card title="Google Business Profile & social">
-        <p className="mb-4 text-sm text-slate-500">
+        <p className="mb-4 text-sm text-ink-3">
           There&apos;s no reliable public write API for this data, so update it here by hand every so
           often. The Marketing page and overview read from the latest snapshot.
         </p>
@@ -93,8 +93,8 @@ export default async function SettingsPage({
 function Row({ label, value }: { label: string; value: string }) {
   return (
     <div>
-      <dt className="text-xs uppercase tracking-wide text-slate-500">{label}</dt>
-      <dd className="mt-0.5 text-slate-800">{value || '—'}</dd>
+      <dt className="text-xs uppercase tracking-wide text-ink-3">{label}</dt>
+      <dd className="mt-0.5 text-ink">{value || '—'}</dd>
     </div>
   );
 }
@@ -107,23 +107,23 @@ async function JobberCard() {
   return (
     <Card title="Jobber connection">
       {!configured ? (
-        <p className="text-sm text-slate-500">
-          Jobber OAuth credentials aren&apos;t set. Add <code className="rounded bg-slate-100 px-1 py-0.5">JOBBER_CLIENT_ID</code> and{' '}
-          <code className="rounded bg-slate-100 px-1 py-0.5">JOBBER_CLIENT_SECRET</code> (see README), then connect.
+        <p className="text-sm text-ink-3">
+          Jobber OAuth credentials aren&apos;t set. Add <code className="rounded bg-panel-2 px-1 py-0.5">JOBBER_CLIENT_ID</code> and{' '}
+          <code className="rounded bg-panel-2 px-1 py-0.5">JOBBER_CLIENT_SECRET</code> (see README), then connect.
         </p>
       ) : (
         <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
           <div className="text-sm">
-            <span className={`inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium ${connected ? 'bg-emerald-100 text-emerald-800' : 'bg-amber-100 text-amber-800'}`}>
+            <span className={`inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium ${connected ? 'bg-emerald-400/10 ring-1 ring-inset ring-emerald-400/20 text-emerald-300' : 'bg-amber-400/10 ring-1 ring-inset ring-amber-400/20 text-amber-300'}`}>
               {connected ? 'Connected' : 'Not connected'}
             </span>
-            <p className="mt-1 text-slate-500">
+            <p className="mt-1 text-ink-3">
               {connected ? 'Jobs, quotes, invoices, and requests sync from Jobber.' : 'Authorize once to start syncing.'}
             </p>
           </div>
           <a
             href="/api/jobber/connect"
-            className="inline-flex items-center rounded-lg bg-slate-900 px-4 py-2 text-sm font-medium text-white transition hover:bg-slate-700"
+            className="inline-flex items-center rounded-lg bg-accent px-4 py-2 text-sm font-medium text-surface transition hover:bg-accent-soft"
           >
             {connected ? 'Reconnect Jobber' : 'Connect Jobber'}
           </a>
@@ -141,17 +141,17 @@ async function QuickBooksCard() {
   return (
     <Card title="QuickBooks connection">
       {!configured ? (
-        <p className="text-sm text-slate-500">
-          QuickBooks OAuth credentials aren&apos;t set. Add <code className="rounded bg-slate-100 px-1 py-0.5">QUICKBOOKS_CLIENT_ID</code> and{' '}
-          <code className="rounded bg-slate-100 px-1 py-0.5">QUICKBOOKS_CLIENT_SECRET</code> (see README), then connect.
+        <p className="text-sm text-ink-3">
+          QuickBooks OAuth credentials aren&apos;t set. Add <code className="rounded bg-panel-2 px-1 py-0.5">QUICKBOOKS_CLIENT_ID</code> and{' '}
+          <code className="rounded bg-panel-2 px-1 py-0.5">QUICKBOOKS_CLIENT_SECRET</code> (see README), then connect.
         </p>
       ) : (
         <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
           <div className="text-sm">
-            <span className={`inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium ${connected ? 'bg-emerald-100 text-emerald-800' : 'bg-amber-100 text-amber-800'}`}>
+            <span className={`inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium ${connected ? 'bg-emerald-400/10 ring-1 ring-inset ring-emerald-400/20 text-emerald-300' : 'bg-amber-400/10 ring-1 ring-inset ring-amber-400/20 text-amber-300'}`}>
               {connected ? 'Connected' : 'Not connected'}
             </span>
-            <p className="mt-1 text-slate-500">
+            <p className="mt-1 text-ink-3">
               {connected
                 ? 'Spending syncs from QuickBooks into the Spending page daily.'
                 : 'Authorize once to start syncing spending & banking.'}
@@ -162,7 +162,7 @@ async function QuickBooksCard() {
               <form action="/api/quickbooks/disconnect" method="post">
                 <button
                   type="submit"
-                  className="inline-flex items-center rounded-lg border border-slate-300 px-4 py-2 text-sm font-medium text-slate-700 transition hover:bg-slate-50"
+                  className="inline-flex items-center rounded-lg border border-edge px-4 py-2 text-sm font-medium text-ink-2 transition hover:bg-panel-2"
                 >
                   Disconnect
                 </button>
@@ -170,7 +170,7 @@ async function QuickBooksCard() {
             )}
             <a
               href="/api/quickbooks/connect"
-              className="inline-flex items-center rounded-lg bg-slate-900 px-4 py-2 text-sm font-medium text-white transition hover:bg-slate-700"
+              className="inline-flex items-center rounded-lg bg-accent px-4 py-2 text-sm font-medium text-surface transition hover:bg-accent-soft"
             >
               {connected ? 'Reconnect QuickBooks' : 'Connect QuickBooks'}
             </a>
@@ -186,7 +186,7 @@ async function GoogleBusinessSection() {
   return (
     <>
       {!isSupabaseConfigured() && (
-        <p className="mb-4 rounded-lg bg-amber-50 p-3 text-xs text-amber-800">
+        <p className="mb-4 rounded-lg bg-amber-400/10 p-3 text-xs text-amber-300">
           Supabase isn&apos;t configured, so saving is disabled — these fields show the sample snapshot.
         </p>
       )}
