@@ -10,7 +10,11 @@ import { CsvImportForm } from '@/app/components/CsvImportForm';
 
 export const dynamic = 'force-dynamic';
 
-export default function SpendingPage() {
+/** Read-only deep-link filter used by ⌘K: ?q=<text> narrows the transactions table. */
+type Filters = { q?: string };
+
+export default async function SpendingPage({ searchParams }: { searchParams: Promise<Filters> }) {
+  const filters = await searchParams;
   return (
     <div className="space-y-6">
       <PageHeader title="Spending" description="Job costs, overhead, and statement imports." />
@@ -41,7 +45,7 @@ export default function SpendingPage() {
       </div>
 
       <Suspense fallback={<TableSkeleton rows={6} />}>
-        <RecentTransactions />
+        <RecentTransactions q={filters.q} />
       </Suspense>
     </div>
   );
@@ -172,12 +176,30 @@ async function ByJob() {
   );
 }
 
-async function RecentTransactions() {
-  const txns = await getTransactions();
+async function RecentTransactions({ q }: { q?: string }) {
+  const all = await getTransactions();
+  const needle = (q ?? '').trim().toLowerCase();
+  const txns = needle
+    ? all.filter(
+        (t) =>
+          t.description.toLowerCase().includes(needle) ||
+          getCategory(t.categoryId).label.toLowerCase().includes(needle),
+      )
+    : all;
   return (
     <Card title="Recent transactions">
+      {needle && (
+        <div className="mb-3 flex items-center justify-between text-xs text-ink-3">
+          <span>
+            Showing {txns.length} of {all.length} transactions
+          </span>
+          <Link href="/spending" className="font-medium text-accent hover:underline">
+            Clear filter
+          </Link>
+        </div>
+      )}
       {txns.length === 0 ? (
-        <EmptyState title="No transactions" message="Imported statement lines will appear here." />
+        <EmptyState title="No transactions" message={needle ? 'Nothing matches that search.' : 'Imported statement lines will appear here.'} />
       ) : (
         <TableWrap>
           <table className="min-w-full text-sm">
