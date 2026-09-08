@@ -23,3 +23,33 @@ body {
   -ms-overflow-style: none;
   scrollbar-width: none;
 }
+
+/*
+ * Visible-but-slim scrollbar for table wrappers. Tables wider than a phone
+ * screen must LOOK scrollable — a fully hidden scrollbar left users unaware
+ * that Status and Balance columns even existed off-screen.
+ */
+.table-scroll {
+  scrollbar-width: thin;
+  scrollbar-color: rgb(203 213 225) transparent;
+}
+.table-scroll::-webkit-scrollbar {
+  height: 8px;
+}
+.table-scroll::-webkit-scrollbar-thumb {
+  background: rgb(203 213 225);
+  border-radius: 4px;
+}
+.table-scroll::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+/*
+ * Keyboard users need to SEE where they are. Buttons, links and the nav had no
+ * focus-visible styling at all; the browser default vanishes on our dark
+ * active-nav chip. One consistent ring, only on keyboard focus.
+ */
+:where(a, button, [role='button'], input, select, textarea, summary):focus-visible {
+  outline: 2px solid rgb(2 132 199);
+  outline-offset: 2px;
+}
