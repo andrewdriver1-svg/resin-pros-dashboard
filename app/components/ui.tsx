@@ -39,14 +39,22 @@ export function StatTile({
   return (
     <div className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm">
       <div className="text-xs font-medium uppercase tracking-wide text-slate-500">{label}</div>
-      <div className={`mt-1 text-2xl font-semibold ${valueTone}`}>{value}</div>
-      {hint && <div className="mt-1 text-xs text-slate-400">{hint}</div>}
+      {/* tabular-nums keeps money and counts from jittering as digits change. */}
+      <div className={`mt-1 text-2xl font-semibold tracking-tight tabular-nums ${valueTone}`}>{value}</div>
+      {/* slate-500, not 400: the hint is what explains the number, and 400 on
+          white fails WCAG contrast — unreadable on a phone in sunlight. */}
+      {hint && <div className="mt-1 text-xs text-slate-500">{hint}</div>}
     </div>
   );
 }
 
-export function StatGrid({ children }: { children: ReactNode }) {
-  return <div className="grid grid-cols-2 gap-3 sm:gap-4 lg:grid-cols-4">{children}</div>;
+/**
+ * `cols` matches the tile count so three tiles don't leave a hole in a
+ * four-column grid (classes written out literally for the Tailwind compiler).
+ */
+export function StatGrid({ children, cols = 4 }: { children: ReactNode; cols?: 2 | 3 | 4 }) {
+  const colsClass = cols === 2 ? 'lg:grid-cols-2' : cols === 3 ? 'lg:grid-cols-3' : 'lg:grid-cols-4';
+  return <div className={`grid grid-cols-2 gap-3 sm:gap-4 ${colsClass}`}>{children}</div>;
 }
 
 export function Card({ title, actions, children }: { title?: string; actions?: ReactNode; children: ReactNode }) {
@@ -76,10 +84,19 @@ export function StatusBadge({ status }: { status: string }) {
 /**
  * Horizontally-scrollable table wrapper — the table never forces the page body
  * to scroll sideways on mobile; it scrolls inside its own container.
+ *
+ * Focusable + labeled region so keyboard users can reach and scroll it (a bare
+ * overflow div can't take focus, which made wide tables keyboard-dead), and a
+ * slim visible scrollbar so phone users can tell columns continue off-screen.
  */
-export function TableWrap({ children }: { children: ReactNode }) {
+export function TableWrap({ children, label }: { children: ReactNode; label?: string }) {
   return (
-    <div className="no-scrollbar -mx-4 overflow-x-auto sm:mx-0">
+    <div
+      tabIndex={0}
+      role="region"
+      aria-label={label ?? 'Table (scrolls horizontally)'}
+      className="table-scroll -mx-4 overflow-x-auto sm:mx-0"
+    >
       <div className="inline-block min-w-full align-middle">{children}</div>
     </div>
   );
