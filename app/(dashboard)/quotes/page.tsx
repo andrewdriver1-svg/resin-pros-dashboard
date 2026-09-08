@@ -1,10 +1,11 @@
 import Link from 'next/link';
 import { Suspense } from 'react';
-import { getInvoices, getQuotes } from '@/lib/db';
+import { getInvoices, getQuoteReviews, getQuotes } from '@/lib/db';
 import { isOverdue } from '@/lib/insights';
 import { formatMoney, formatDate } from '@/app/components/format';
 import { PageHeader, Card, StatGrid, StatTile, StatusBadge, TableWrap } from '@/app/components/ui';
 import { EmptyState, StatGridSkeleton, TableSkeleton } from '@/app/components/states';
+import { QuoteReviewControls } from '@/app/components/QuoteReviewControls';
 
 export const dynamic = 'force-dynamic';
 
@@ -55,15 +56,21 @@ function matchesQ(q: string, ...fields: (string | undefined)[]): boolean {
 }
 
 async function MoneyStats() {
-  const [quotes, invoices] = await Promise.all([getQuotes(), getInvoices()]);
+  const [quotes, invoices, reviews] = await Promise.all([getQuotes(), getInvoices(), getQuoteReviews()]);
   const openQuotes = quotes.filter((q) => q.status === 'awaiting_response' || q.status === 'draft');
   const openQuoteValue = openQuotes.reduce((s, q) => s + q.amount, 0);
+  // Raw = what Jobber reports. Adjusted = minus internally-reviewed dead value.
+  const DEAD = new Set(['likely_dead', 'known_lost']);
+  const adjusted = openQuotes
+    .filter((q) => !DEAD.has(reviews.get(q.id)?.classification ?? ''))
+    .reduce((s, q) => s + q.amount, 0);
   const outstanding = invoices.reduce((s, i) => s + Math.max(0, i.amount - i.amountPaid), 0);
   const pastDue = invoices.filter((i) => i.status === 'past_due').reduce((s, i) => s + Math.max(0, i.amount - i.amountPaid), 0);
 
   return (
     <StatGrid>
-      <StatTile label="Open quotes" value={formatMoney(openQuoteValue)} hint={`${openQuotes.length} awaiting response`} />
+      <StatTile label="Raw open quotes" value={formatMoney(openQuoteValue)} hint={`${openQuotes.length} awaiting response (Jobber)`} />
+      <StatTile label="Adjusted pipeline" value={formatMoney(adjusted)} hint="After internal review" />
       <StatTile label="Outstanding AR" value={formatMoney(outstanding)} tone={outstanding > 0 ? 'negative' : 'positive'} />
       <StatTile label="Past due" value={formatMoney(pastDue)} tone={pastDue > 0 ? 'negative' : 'positive'} />
     </StatGrid>
@@ -80,7 +87,8 @@ function JobLink({ jobId, children }: { jobId?: string; children: React.ReactNod
 }
 
 async function Quotes({ filters }: { filters: Filters }) {
-  const quotes = await getQuotes();
+  const [quotes, reviews] = await Promise.all([getQuotes(), getQuoteReviews()]);
+  const reviewMode = filters.view === 'stale';
   const q = (filters.q ?? '').trim();
   const staleCutoff = Date.now() - 7 * DAY_MS;
   const visible = quotes
@@ -93,7 +101,13 @@ async function Quotes({ filters }: { filters: Filters }) {
   const filtered = Boolean(q || filters.view === 'stale');
 
   return (
-    <Card title={filters.view === 'stale' ? 'Stale quotes (7+ days, no answer)' : 'Quotes'}>
+    <Card title={reviewMode ? 'Stale quote review (7+ days, no answer)' : 'Quotes'}>
+      {reviewMode && (
+        <p className="mb-3 text-xs leading-snug text-ink-4">
+          Classify each quote to clean the pipeline. Classifications are internal — nothing changes in Jobber, and the
+          raw number is preserved. “Follow up” also opens a prefilled task.
+        </p>
+      )}
       {filtered && <FilterBanner shown={visible.length} total={quotes.length} label="quotes" />}
       {visible.length === 0 ? (
         <EmptyState
@@ -110,6 +124,7 @@ async function Quotes({ filters }: { filters: Filters }) {
                 <th scope="col" className="px-3 py-2 font-medium">Issued</th>
                 <th scope="col" className="px-3 py-2 font-medium">Job</th>
                 <th scope="col" className="px-3 py-2 font-medium">Status</th>
+                {reviewMode && <th scope="col" className="px-3 py-2 font-medium">Internal review</th>}
                 <th scope="col" className="px-3 py-2 text-right font-medium">Amount</th>
               </tr>
             </thead>
@@ -121,6 +136,16 @@ async function Quotes({ filters }: { filters: Filters }) {
                   <td className="whitespace-nowrap px-3 py-2.5 text-ink-3">{formatDate(quote.issuedAt)}</td>
                   <td className="px-3 py-2.5"><JobLink jobId={quote.jobId}>View</JobLink></td>
                   <td className="px-3 py-2.5"><StatusBadge status={quote.status} /></td>
+                  {reviewMode && (
+                    <td className="px-3 py-2.5">
+                      <QuoteReviewControls
+                        quoteId={quote.id}
+                        quoteNumber={quote.number}
+                        clientName={quote.clientName}
+                        current={reviews.get(quote.id)?.classification}
+                      />
+                    </td>
+                  )}
                   <td className="whitespace-nowrap px-3 py-2.5 text-right font-medium tabular-nums text-ink">{formatMoney(quote.amount)}</td>
                 </tr>
               ))}
