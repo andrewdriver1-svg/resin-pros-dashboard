@@ -1,18 +1,28 @@
 import Link from 'next/link';
 import { notFound } from 'next/navigation';
 import { getCategory } from '@/config/business.config';
-import { getJob } from '@/lib/db';
+import { getJob, getNotes, getTasks } from '@/lib/db';
 import { sumAmount } from '@/lib/spending';
+import { isActionable } from '@/lib/tasks';
 import { formatMoney, formatDate } from '@/app/components/format';
 import { PageHeader, Card, StatGrid, StatTile, StatusBadge, TableWrap } from '@/app/components/ui';
 import { EmptyState } from '@/app/components/states';
+import { TaskItem } from '@/app/components/TaskItem';
+import { AddJobTaskButton, JobNoteForm } from './job-task-controls';
 
 export const dynamic = 'force-dynamic';
 
 export default async function JobDetailPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
-  const job = await getJob(id);
+  const [job, allTasks, allNotes] = await Promise.all([getJob(id), getTasks(), getNotes()]);
   if (!job) notFound();
+
+  const jobTasks = allTasks
+    .filter((t) => t.entityType === 'job' && t.entityId === id)
+    .map((t) => ({ ...t, entityLabel: job.title }));
+  const openTasks = jobTasks.filter(isActionable);
+  const doneTasks = jobTasks.filter((t) => !isActionable(t)).slice(0, 5);
+  const jobNotes = allNotes.filter((n) => n.entityType === 'job' && n.entityId === id);
 
   const totalCost = sumAmount(job.costs);
   const margin = job.value - totalCost;
@@ -76,6 +86,39 @@ export default async function JobDetailPage({ params }: { params: Promise<{ id: 
           </dl>
         </Card>
       )}
+
+      <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
+        <Card title={`Tasks (${openTasks.length} open)`} actions={<AddJobTaskButton jobId={job.id} jobTitle={job.title} />}>
+          {jobTasks.length === 0 ? (
+            <EmptyState title="No tasks yet" message="Tasks added here link to this job automatically and show up in To Do, Today, and Calendar." />
+          ) : (
+            <div className="-mx-2 divide-y divide-edge-soft/60">
+              {openTasks.map((t) => (
+                <TaskItem key={t.id} task={t} />
+              ))}
+              {doneTasks.map((t) => (
+                <TaskItem key={t.id} task={t} />
+              ))}
+            </div>
+          )}
+        </Card>
+
+        <Card title="Notes (internal)">
+          {jobNotes.length === 0 ? (
+            <p className="py-2 text-sm text-ink-3">No notes yet. Notes stay internal — they never sync to Jobber.</p>
+          ) : (
+            <ul className="space-y-2">
+              {jobNotes.map((n) => (
+                <li key={n.id} className="rounded-lg border border-edge-soft bg-panel-2/40 px-3 py-2 text-sm text-ink-2">
+                  {n.body}
+                  <span className="mt-1 block text-[11px] text-ink-4">{formatDate(n.createdAt)}</span>
+                </li>
+              ))}
+            </ul>
+          )}
+          <JobNoteForm jobId={job.id} />
+        </Card>
+      </div>
 
       <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
         <Card title="Quotes">
