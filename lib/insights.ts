@@ -80,6 +80,16 @@ export interface KpiSummary {
   adjustedCount: number;
   /** Open value awaiting internal review (no classification yet). */
   unreviewedPipeline: number;
+  unreviewedCount: number;
+  /** Open value classified follow_up — the owner intends to chase these. */
+  followUpPipeline: number;
+  followUpCount: number;
+  /** Open value classified likely_dead (internal judgment, source untouched). */
+  likelyDeadPipeline: number;
+  likelyDeadCount: number;
+  /** Open value classified known_lost (internal judgment, source untouched). */
+  knownLostPipeline: number;
+  knownLostCount: number;
   weightedPipeline: number;
   arOutstanding: number;
   arOverdue: number;
@@ -154,9 +164,13 @@ export function computeKpis(
   const DEAD = new Set(['likely_dead', 'known_lost']);
   const aliveQuotes = openQuotes.filter((q) => !DEAD.has(reviews.get(q.id)?.classification ?? ''));
   const adjustedPipeline = aliveQuotes.reduce((s, q) => s + q.amount, 0);
-  const unreviewedPipeline = openQuotes
-    .filter((q) => !reviews.has(q.id))
-    .reduce((s, q) => s + q.amount, 0);
+  const sumWhere = (pred: (q: Quote) => boolean) =>
+    openQuotes.filter(pred).reduce((acc, q) => ({ v: acc.v + q.amount, n: acc.n + 1 }), { v: 0, n: 0 });
+  const unreviewed = sumWhere((q) => !reviews.has(q.id));
+  const followUp = sumWhere((q) => reviews.get(q.id)?.classification === 'follow_up');
+  const likelyDead = sumWhere((q) => reviews.get(q.id)?.classification === 'likely_dead');
+  const knownLost = sumWhere((q) => reviews.get(q.id)?.classification === 'known_lost');
+  const unreviewedPipeline = unreviewed.v;
 
   const active = data.jobs.filter((j) => j.status === 'in_progress' || j.status === 'scheduled');
 
@@ -175,6 +189,13 @@ export function computeKpis(
     adjustedPipeline,
     adjustedCount: aliveQuotes.length,
     unreviewedPipeline,
+    unreviewedCount: unreviewed.n,
+    followUpPipeline: followUp.v,
+    followUpCount: followUp.n,
+    likelyDeadPipeline: likelyDead.v,
+    likelyDeadCount: likelyDead.n,
+    knownLostPipeline: knownLost.v,
+    knownLostCount: knownLost.n,
     // Weighted on the ADJUSTED number — dead deals shouldn't inflate planning.
     weightedPipeline: adjustedPipeline * PIPELINE_WEIGHT,
     arOutstanding,
@@ -360,25 +381,71 @@ export function computeAttention(
     todos: MaterialTodo[];
     /** Internal ack/snooze/resolve states, keyed by item id. */
     attentionStates?: Map<string, AttentionStateRecord>;
+    /** Latest recorded Jobber sync run, for the missed-sync alert. */
+    jobberSync?: { ranAt: string; ok: boolean } | null;
   },
   now: Date = new Date(),
 ): AttentionItem[] {
   const nowMs = now.getTime();
   const items: AttentionItem[] = [];
 
+  // Missed/failed sync — the OS must say when its own inputs are stale.
+  // (Only when a sync log exists: before the first recorded run there is
+  // nothing trustworthy to alarm on, and the Systems indicator still covers
+  // the legacy heuristic.)
+  if (data.jobberSync) {
+    const ranMs = new Date(data.jobberSync.ranAt).getTime();
+    const hoursAgo = Math.floor((nowMs - ranMs) / 3_600_000);
+    if (!data.jobberSync.ok) {
+      items.push({
+        id: 'sync-jobber',
+        severity: 'high',
+        title: 'Jobber sync FAILED on its last run',
+        detail: `The last attempt ${hoursAgo}h ago recorded errors — numbers below may be stale. Check Settings → Sync.`,
+        href: '/settings',
+        linkLabel: 'Open settings',
+        value: 0,
+      });
+    } else if (Number.isFinite(ranMs) && nowMs - ranMs > 36 * 3_600_000) {
+      items.push({
+        id: 'sync-jobber',
+        severity: 'high',
+        title: 'Jobber sync overdue',
+        detail: `No sync recorded for ${Math.floor(hoursAgo / 24)}+ days (expected daily). Job/quote/invoice numbers may be stale.`,
+        href: '/settings',
+        linkLabel: 'Open settings',
+        value: 0,
+      });
+    }
+  }
+
   for (const inv of data.invoices) {
     if (!isOverdue(inv, nowMs)) continue;
     const bal = invoiceBalance(inv);
     const days = inv.dueAt ? ageDays(inv.dueAt, nowMs) : null;
+    // Source inconsistency: Jobber says PAID yet reports an open balance.
+    // Say exactly that instead of a generic "overdue" — the fix lives in
+    // Jobber (record the missing payment, or reopen the invoice).
+    const paidMismatch = inv.status === 'paid';
     items.push({
       id: `inv-${inv.id}`,
       severity: 'high',
-      title: `Invoice ${inv.number || '—'} · ${money(bal)} overdue`,
-      detail: `${inv.clientName}${days != null && days > 0 ? ` — due ${days} day${days === 1 ? '' : 's'} ago` : ''}.`,
+      title: paidMismatch
+        ? `Invoice ${inv.number || '—'} marked PAID in Jobber but ${money(bal)} balance remains`
+        : `Invoice ${inv.number || '—'} · ${money(bal)} overdue`,
+      detail: paidMismatch
+        ? `${inv.clientName} — Jobber's status and its own balance disagree. Open it in Jobber: record the missing payment, or reopen the invoice.`
+        : `${inv.clientName}${days != null && days > 0 ? ` — due ${days} day${days === 1 ? '' : 's'} ago` : ''}.`,
       href: inv.number ? `/quotes?q=${encodeURIComponent(inv.number)}` : '/quotes?view=overdue',
       linkLabel: 'View invoice',
       value: bal,
-      followUp: { title: `Collect ${inv.number || 'invoice'} — ${money(bal)} (${inv.clientName})`, entityType: 'invoice', entityId: inv.id },
+      followUp: {
+        title: paidMismatch
+          ? `Verify ${inv.number || 'invoice'} in Jobber — paid status vs ${money(bal)} balance (${inv.clientName})`
+          : `Collect ${inv.number || 'invoice'} — ${money(bal)} (${inv.clientName})`,
+        entityType: 'invoice',
+        entityId: inv.id,
+      },
     });
   }
 

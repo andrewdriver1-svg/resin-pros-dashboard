@@ -232,6 +232,72 @@ describe('adjusted pipeline (quote reviews)', () => {
   });
 });
 
+describe('pipeline truth breakdown (C.2)', () => {
+  it('splits open value into follow-up / likely-dead / known-lost / unreviewed', () => {
+    const reviews = new Map([
+      ['a', { quoteId: 'a', classification: 'follow_up' as const, reviewedAt: '2026-09-01' }],
+      ['b', { quoteId: 'b', classification: 'likely_dead' as const, reviewedAt: '2026-09-01' }],
+      ['c', { quoteId: 'c', classification: 'known_lost' as const, reviewedAt: '2026-09-01' }],
+    ]);
+    const k = computeKpis(
+      {
+        ...empty,
+        quotes: [
+          quote({ id: 'a', amount: 10_000 }),
+          quote({ id: 'b', amount: 20_000 }),
+          quote({ id: 'c', amount: 30_000 }),
+          quote({ id: 'd', amount: 40_000 }), // unreviewed
+        ],
+        quoteReviews: reviews,
+      },
+      NOW,
+    );
+    expect(k.pipelineValue).toBe(100_000); // raw untouched
+    expect(k.followUpPipeline).toBe(10_000);
+    expect(k.likelyDeadPipeline).toBe(20_000);
+    expect(k.knownLostPipeline).toBe(30_000);
+    expect(k.unreviewedPipeline).toBe(40_000);
+    expect(k.adjustedPipeline).toBe(50_000); // raw minus dead classes
+  });
+});
+
+describe('sync + source-mismatch attention (C.2)', () => {
+  it('flags an overdue Jobber sync (>36h) and a failed last sync', () => {
+    const base = { jobs: [], quotes: [], invoices: [], leads: [], todos: [] };
+    const stale = computeAttention(
+      { ...base, jobberSync: { ranAt: '2026-09-05T16:00:00Z', ok: true } }, // 3 days before NOW
+      NOW,
+    );
+    expect(stale.some((i) => i.id === 'sync-jobber' && i.title.includes('overdue'))).toBe(true);
+
+    const failed = computeAttention({ ...base, jobberSync: { ranAt: '2026-09-08T10:00:00Z', ok: false } }, NOW);
+    expect(failed.some((i) => i.id === 'sync-jobber' && i.title.includes('FAILED'))).toBe(true);
+
+    const fresh = computeAttention({ ...base, jobberSync: { ranAt: '2026-09-08T10:00:00Z', ok: true } }, NOW);
+    expect(fresh.some((i) => i.id === 'sync-jobber')).toBe(false);
+
+    const noLog = computeAttention(base, NOW);
+    expect(noLog.some((i) => i.id === 'sync-jobber')).toBe(false);
+  });
+
+  it('calls out a PAID invoice that still carries a balance as a source mismatch', () => {
+    const items = computeAttention(
+      {
+        jobs: [],
+        quotes: [],
+        invoices: [inv({ id: 'x', status: 'paid', amount: 22_700, amountPaid: 11_350, dueAt: '2026-06-01' })],
+        leads: [],
+        todos: [],
+      },
+      NOW,
+    );
+    const item = items.find((i) => i.id === 'inv-x')!;
+    expect(item.title).toContain('marked PAID');
+    expect(item.title).toContain('11,350');
+    expect(item.detail).toContain('Jobber');
+  });
+});
+
 describe('attention states', () => {
   const base = {
     jobs: [],

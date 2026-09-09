@@ -9,7 +9,7 @@ import { tzParts } from '@/lib/insights';
 
 export type TaskStatus = 'open' | 'in_progress' | 'done' | 'cancelled';
 export type TaskPriority = 'low' | 'normal' | 'high' | 'urgent';
-export type TaskEntityType = 'job' | 'quote' | 'invoice' | 'lead';
+export type TaskEntityType = 'job' | 'quote' | 'invoice' | 'lead' | 'customer';
 export type TaskSource = 'manual' | 'attention' | 'claude' | 'automation' | 'job' | 'system';
 
 export interface Task {
@@ -201,12 +201,14 @@ export function labelTasks(
     quotes?: { id: string; number: string; clientName: string }[];
     invoices?: { id: string; number: string; clientName: string }[];
     leads?: { id: string; clientName: string }[];
+    customers?: { id: string; name: string }[];
   },
 ): Task[] {
   const jobs = new Map((lookup.jobs ?? []).map((j) => [j.id, `${j.title}`]));
   const quotes = new Map((lookup.quotes ?? []).map((q) => [q.id, `Quote ${q.number} · ${q.clientName}`]));
   const invoices = new Map((lookup.invoices ?? []).map((i) => [i.id, `Invoice ${i.number} · ${i.clientName}`]));
   const leads = new Map((lookup.leads ?? []).map((l) => [l.id, `Lead: ${l.clientName}`]));
+  const customers = new Map((lookup.customers ?? []).map((c) => [c.id, `Customer: ${c.name}`]));
   return tasks.map((t) => {
     if (t.entityLabel || !t.entityType || !t.entityId) return t;
     const label =
@@ -216,7 +218,9 @@ export function labelTasks(
           ? quotes.get(t.entityId)
           : t.entityType === 'invoice'
             ? invoices.get(t.entityId)
-            : leads.get(t.entityId);
+            : t.entityType === 'customer'
+              ? customers.get(t.entityId)
+              : leads.get(t.entityId);
     return label ? { ...t, entityLabel: label } : t;
   });
 }
