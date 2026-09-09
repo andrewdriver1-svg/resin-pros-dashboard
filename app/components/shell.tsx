@@ -151,7 +151,10 @@ const NAV_GROUPS: { label: string; items: { href: string; label: string; icon: s
   },
   {
     label: 'Intelligence',
-    items: [{ href: '/marketing', label: 'Marketing', icon: 'marketing' }],
+    items: [
+      { href: '/market-radar', label: 'Market Radar', icon: 'marketing' },
+      { href: '/marketing', label: 'Marketing', icon: 'marketing' },
+    ],
   },
   {
     label: 'System',

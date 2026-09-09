@@ -108,3 +108,44 @@ export async function postBidAction(
     return (await res.json()) as { ok: boolean; draft?: { subject: string; body: string; to: string | null } };
   } catch { return null; }
 }
+
+export type RadarRun = {
+  status: string; started_at: string; completed_at: string | null; trigger_type: string;
+  duration_ms: number | null; records_received: number | null; records_created: number | null;
+  records_updated: number | null; records_unchanged: number | null; error_summary: string | null;
+};
+
+export type RadarSummary = {
+  counts: {
+    new_today: number; updated_today: number; high_priority: number;
+    sources_sought: number; active_federal: number; pursuing: number; awards_captured: number;
+  };
+  sources: Array<{
+    key: string; label: string; health: "HEALTHY" | "SYNCING" | "ERROR" | "STALE" | "UNKNOWN";
+    expected: string; lastSuccess: RadarRun | null; historyNote: string | null; runs: RadarRun[];
+  }>;
+};
+
+export type RadarOpportunity = {
+  id: string; title: string; agency: string | null; place: string | null;
+  distance_miles: string | null; set_aside: string | null; deadline_at: string | null;
+  url: string | null; pipeline_state: string; sol_number: string | null;
+  notice_type: string | null; go_no_go_score: string | null;
+  first_detected_at: string; last_changed_at: string; has_poc: boolean; poc_name: string | null;
+};
+
+export type RadarAward = {
+  awardee_name: string; award_amount_cents: string | null; award_date: string | null;
+  agency: string | null; place: string | null; distance_miles: string | null;
+  title: string; sol_number: string | null; url: string | null;
+};
+
+export function getRadarSummary() {
+  return fetchMachine<RadarSummary>("/api/radar/summary");
+}
+export function getRadarView(view: string, limit = 10) {
+  return fetchMachine<{ opportunities: RadarOpportunity[] }>(`/api/radar/opportunities?view=${view}&limit=${limit}`);
+}
+export function getRadarAwards() {
+  return fetchMachine<{ awards: RadarAward[]; stats: { total: number; total_cents: string | null } }>("/api/radar/awards");
+}

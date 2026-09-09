@@ -22,6 +22,7 @@ import { Card, HealthBadge, StatusBadge } from '@/app/components/ui';
 import { EmptyState, TableSkeleton } from '@/app/components/states';
 import { TaskItem } from '@/app/components/TaskItem';
 import { AttentionList } from '@/app/components/AttentionList';
+import { MarketRadarCard } from '@/app/components/MarketRadarCard';
 
 export const dynamic = 'force-dynamic';
 
@@ -96,6 +97,9 @@ export default function TodayPage() {
 
         {/* Intelligence rail — deterministic today; Claude takes this surface over in Phase D. */}
         <div className="space-y-6">
+          <Suspense fallback={<TableSkeleton rows={3} />}>
+            <MarketRadarCard />
+          </Suspense>
           <Suspense fallback={<TableSkeleton rows={3} />}>
             <NextUp now={now} />
           </Suspense>
