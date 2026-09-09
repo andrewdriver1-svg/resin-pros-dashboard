@@ -46,18 +46,41 @@ async function getStatuses(): Promise<{ sources: SourceStatus[]; worst: 'good' |
   if (probe.ok) {
     try {
       const supabase = await createSupabaseServerClient();
-      const { data } = await supabase
-        .from('jobs')
-        .select('updated_at')
-        .order('updated_at', { ascending: false })
+      // Primary truth: the recorded sync run (written by every cron/webhook/
+      // manual sync). max(jobs.updated_at) only records row INSERTS (there are
+      // no update triggers), so it drifts stale whenever the business simply
+      // has no new jobs — it remains only the legacy fallback.
+      const { data: run } = await supabase
+        .from('sync_runs')
+        .select('ran_at, ok, errors')
+        .eq('source', 'jobber')
+        .order('ran_at', { ascending: false })
         .limit(1)
         .maybeSingle();
-      const at = data?.updated_at ? new Date(data.updated_at as string).getTime() : null;
-      sources.push({
-        name: 'Jobber',
-        detail: at ? `Synced ${relativeTime(new Date(at).toISOString())}` : 'No synced data yet',
-        tone: at ? (Date.now() - at > STALE_JOBBER_MS ? 'warn' : 'good') : 'muted',
-      });
+      if (run?.ran_at) {
+        const at = new Date(run.ran_at as string).getTime();
+        const failed = run.ok === false;
+        sources.push({
+          name: 'Jobber',
+          detail: failed
+            ? `Last sync FAILED ${relativeTime(new Date(at).toISOString())}`
+            : `Synced ${relativeTime(new Date(at).toISOString())}`,
+          tone: failed ? 'bad' : Date.now() - at > STALE_JOBBER_MS ? 'warn' : 'good',
+        });
+      } else {
+        const { data } = await supabase
+          .from('jobs')
+          .select('updated_at')
+          .order('updated_at', { ascending: false })
+          .limit(1)
+          .maybeSingle();
+        const at = data?.updated_at ? new Date(data.updated_at as string).getTime() : null;
+        sources.push({
+          name: 'Jobber',
+          detail: at ? `Data as of ${relativeTime(new Date(at).toISOString())} (no sync log yet)` : 'No synced data yet',
+          tone: at ? (Date.now() - at > STALE_JOBBER_MS ? 'warn' : 'good') : 'muted',
+        });
+      }
     } catch {
       sources.push({ name: 'Jobber', detail: 'Freshness unknown', tone: 'muted' });
     }

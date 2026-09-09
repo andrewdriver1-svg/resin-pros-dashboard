@@ -39,7 +39,7 @@ export function QuickCreate({ jobOptions }: { jobOptions: JobOption[] }) {
   const [dueTime, setDueTime] = useState('');
   const [priority, setPriority] = useState<'low' | 'normal' | 'high' | 'urgent'>('normal');
   const [jobQuery, setJobQuery] = useState('');
-  const [linked, setLinked] = useState<{ type: 'job' | 'quote' | 'invoice' | 'lead'; id: string; label: string } | null>(null);
+  const [linked, setLinked] = useState<{ type: 'job' | 'quote' | 'invoice' | 'lead' | 'customer'; id: string; label: string } | null>(null);
   const [personal, setPersonal] = useState(false);
 
   // Event form state

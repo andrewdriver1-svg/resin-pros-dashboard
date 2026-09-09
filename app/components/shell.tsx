@@ -134,6 +134,7 @@ const NAV_GROUPS: { label: string; items: { href: string; label: string; icon: s
   {
     label: 'Sales',
     items: [
+      { href: '/customers', label: 'Customers', icon: 'leads' },
       { href: '/leads', label: 'Leads', icon: 'leads' },
       { href: '/quotes', label: 'Quotes & Invoices', icon: 'quotes' },
     ],

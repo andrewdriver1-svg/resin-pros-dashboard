@@ -17,7 +17,7 @@ export const OPEN_DRAWER_EVENT = 'rp:open-drawer';
 export interface TaskPrefill {
   title?: string;
   dueDate?: string;
-  entityType?: 'job' | 'quote' | 'invoice' | 'lead';
+  entityType?: 'job' | 'quote' | 'invoice' | 'lead' | 'customer';
   entityId?: string;
   entityLabel?: string;
 }
