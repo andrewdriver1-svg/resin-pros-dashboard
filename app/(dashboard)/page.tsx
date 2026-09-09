@@ -10,6 +10,7 @@ import {
   getLeads,
   getQuotes,
   getQuoteReviews,
+  getSyncRuns,
   getTasks,
   getTodos,
   getTransactions,
@@ -34,7 +35,7 @@ export const dynamic = 'force-dynamic';
  */
 
 const loadAll = cache(async () => {
-  const [jobs, quotes, invoices, leads, transactions, todos, tasksRaw, events, activity, attentionStates, quoteReviews] =
+  const [jobs, quotes, invoices, leads, transactions, todos, tasksRaw, events, activity, attentionStates, quoteReviews, syncRuns] =
     await Promise.all([
       getJobs(),
       getQuotes(),
@@ -47,9 +48,11 @@ const loadAll = cache(async () => {
       getActivity(12),
       getAttentionStates(),
       getQuoteReviews(),
+      getSyncRuns('jobber', 1),
     ]);
   const tasks = labelTasks(tasksRaw, { jobs, quotes, invoices, leads });
-  return { jobs, quotes, invoices, leads, transactions, todos, tasks, events, activity, attentionStates, quoteReviews };
+  const jobberSync = syncRuns[0] ? { ranAt: syncRuns[0].ranAt, ok: syncRuns[0].ok } : null;
+  return { jobs, quotes, invoices, leads, transactions, todos, tasks, events, activity, attentionStates, quoteReviews, jobberSync };
 });
 
 function greeting(now: Date): string {
