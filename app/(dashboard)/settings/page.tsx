@@ -1,12 +1,13 @@
 import { Suspense } from 'react';
 import { businessConfig } from '@/config/business.config';
-import { getGoogleBusinessSnapshot } from '@/lib/db';
+import { getGoogleBusinessSnapshot, getSyncRuns } from '@/lib/db';
 import { isJobberConfigured, loadJobberTokens } from '@/lib/jobber/client';
 import { isQuickBooksConfigured, loadQuickBooksTokens } from '@/lib/quickbooks/client';
 import { isSupabaseConfigured } from '@/lib/supabase/env';
 import { PageHeader, Card } from '@/app/components/ui';
 import { TableSkeleton } from '@/app/components/states';
 import { GoogleBusinessForm } from '@/app/components/GoogleBusinessForm';
+import { SyncNowButton } from '@/app/components/SyncNowButton';
 
 export const dynamic = 'force-dynamic';
 
@@ -101,7 +102,10 @@ function Row({ label, value }: { label: string; value: string }) {
 
 async function JobberCard() {
   const configured = isJobberConfigured();
-  const tokens = configured ? await loadJobberTokens() : null;
+  const [tokens, runs] = await Promise.all([
+    configured ? loadJobberTokens() : Promise.resolve(null),
+    getSyncRuns('jobber', 3),
+  ]);
   const connected = Boolean(tokens?.accessToken);
 
   return (
@@ -112,21 +116,40 @@ async function JobberCard() {
           <code className="rounded bg-panel-2 px-1 py-0.5">JOBBER_CLIENT_SECRET</code> (see README), then connect.
         </p>
       ) : (
-        <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-          <div className="text-sm">
-            <span className={`inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium ${connected ? 'bg-emerald-400/10 ring-1 ring-inset ring-emerald-400/20 text-emerald-300' : 'bg-amber-400/10 ring-1 ring-inset ring-amber-400/20 text-amber-300'}`}>
-              {connected ? 'Connected' : 'Not connected'}
-            </span>
-            <p className="mt-1 text-ink-3">
-              {connected ? 'Jobs, quotes, invoices, and requests sync from Jobber.' : 'Authorize once to start syncing.'}
-            </p>
+        <div className="space-y-4">
+          <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+            <div className="text-sm">
+              <span className={`inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium ${connected ? 'bg-emerald-400/10 ring-1 ring-inset ring-emerald-400/20 text-emerald-300' : 'bg-amber-400/10 ring-1 ring-inset ring-amber-400/20 text-amber-300'}`}>
+                {connected ? 'Connected' : 'Not connected'}
+              </span>
+              <p className="mt-1 text-ink-3">
+                {connected ? 'Jobs, quotes, invoices, and requests sync from Jobber.' : 'Authorize once to start syncing.'}
+              </p>
+            </div>
+            <div className="flex items-center gap-2">
+              {connected && <SyncNowButton />}
+              <a
+                href="/api/jobber/connect"
+                className="inline-flex items-center rounded-lg bg-accent px-4 py-2 text-sm font-medium text-surface transition hover:bg-accent-soft"
+              >
+                {connected ? 'Reconnect Jobber' : 'Connect Jobber'}
+              </a>
+            </div>
           </div>
-          <a
-            href="/api/jobber/connect"
-            className="inline-flex items-center rounded-lg bg-accent px-4 py-2 text-sm font-medium text-surface transition hover:bg-accent-soft"
-          >
-            {connected ? 'Reconnect Jobber' : 'Connect Jobber'}
-          </a>
+          {runs.length > 0 && (
+            <div className="text-xs text-ink-4">
+              <span className="font-semibold uppercase tracking-wide">Recent syncs</span>
+              <ul className="mt-1 space-y-0.5">
+                {runs.map((r) => (
+                  <li key={r.id}>
+                    <span className={r.ok ? 'text-good' : 'text-bad'}>{r.ok ? '●' : '●'}</span>{' '}
+                    {new Date(r.ranAt).toLocaleString('en-US', { timeZone: businessConfig.contact.timezone, month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' })}{' '}
+                    — {r.ok ? `${r.jobs} jobs · ${r.quotes} quotes · ${r.invoices} invoices · ${r.leads} leads` : r.errors.join('; ') || 'failed'}
+                  </li>
+                ))}
+              </ul>
+            </div>
+          )}
         </div>
       )}
     </Card>
