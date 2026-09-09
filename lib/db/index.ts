@@ -32,6 +32,7 @@ import type { CalendarEvent } from '@/lib/calendar';
 import type {
   ActivityEntry,
   AttentionStateRecord,
+  Customer,
   GoogleBusinessSnapshot,
   Invoice,
   Job,
@@ -43,6 +44,7 @@ import type {
   NoteRecord,
   Quote,
   QuoteReviewRecord,
+  SyncRun,
   Transaction,
 } from './types';
 
@@ -138,6 +140,7 @@ function rowToJob(r: Row): Job {
   return {
     id: str(r.id),
     jobberId: optStr(r.jobber_id),
+    jobberClientId: optStr(r.jobber_client_id),
     title: str(r.title, 'Untitled job'),
     clientName: str(r.client_name, 'Unknown client'),
     address: optStr(r.address),
@@ -153,6 +156,7 @@ function rowToQuote(r: Row): Quote {
   return {
     id: str(r.id),
     jobberId: optStr(r.jobber_id),
+    jobberClientId: optStr(r.jobber_client_id),
     jobId: optStr(r.job_id),
     number: str(r.number),
     clientName: str(r.client_name, 'Unknown client'),
@@ -166,6 +170,7 @@ function rowToInvoice(r: Row): Invoice {
   return {
     id: str(r.id),
     jobberId: optStr(r.jobber_id),
+    jobberClientId: optStr(r.jobber_client_id),
     jobId: optStr(r.job_id),
     number: str(r.number),
     clientName: str(r.client_name, 'Unknown client'),
@@ -207,6 +212,7 @@ function rowToLead(r: Row): Lead {
   return {
     id: str(r.id),
     jobberId: optStr(r.jobber_id),
+    jobberClientId: optStr(r.jobber_client_id),
     clientName: str(r.client_name, 'Unknown'),
     contactEmail: optStr(r.contact_email),
     contactPhone: optStr(r.contact_phone),
@@ -445,4 +451,43 @@ export async function getQuoteReviews(): Promise<Map<string, QuoteReviewRecord>>
     fixture: [],
   });
   return new Map(rows.map((r) => [r.quoteId, r]));
+}
+
+/** Customers — real client relationships keyed on Jobber's stable client id. */
+export function getCustomers(): Promise<Customer[]> {
+  return readList<Customer>({
+    table: 'customers',
+    map: (r) => ({
+      id: str(r.id),
+      jobberClientId: str(r.jobber_client_id),
+      name: str(r.name, 'Unknown client'),
+      email: optStr(r.email),
+      phone: optStr(r.phone),
+      createdAt: str(r.created_at),
+      updatedAt: str(r.updated_at),
+    }),
+    fixture: [],
+    order: { column: 'name', ascending: true },
+  });
+}
+
+/** Recorded sync executions, newest first — the truth of "when did we last sync". */
+export async function getSyncRuns(source: 'jobber' | 'quickbooks', limit = 5): Promise<SyncRun[]> {
+  const rows = await readList<SyncRun>({
+    table: 'sync_runs',
+    map: (r) => ({
+      id: num(r.id),
+      source: str(r.source, 'jobber') as SyncRun['source'],
+      ranAt: str(r.ran_at),
+      ok: r.ok === true,
+      jobs: num(r.jobs),
+      quotes: num(r.quotes),
+      invoices: num(r.invoices),
+      leads: num(r.leads),
+      errors: Array.isArray(r.errors) ? (r.errors as string[]) : [],
+    }),
+    fixture: [],
+    order: { column: 'ran_at', ascending: false },
+  });
+  return rows.filter((r) => r.source === source).slice(0, limit);
 }

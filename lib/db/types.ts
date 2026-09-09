@@ -27,6 +27,8 @@ export interface Lead {
   id: string;
   /** Jobber request/client id, when synced. */
   jobberId?: string;
+  /** Jobber's stable client id — links the record to a Customer. */
+  jobberClientId?: string;
   clientName: string;
   contactEmail?: string;
   contactPhone?: string;
@@ -58,6 +60,7 @@ export interface JobCost {
 export interface Quote {
   id: string;
   jobberId?: string;
+  jobberClientId?: string;
   jobId?: string;
   number: string;
   clientName: string;
@@ -70,6 +73,7 @@ export interface Quote {
 export interface Invoice {
   id: string;
   jobberId?: string;
+  jobberClientId?: string;
   jobId?: string;
   number: string;
   clientName: string;
@@ -97,6 +101,7 @@ export interface MaterialTodo {
 export interface Job {
   id: string;
   jobberId?: string;
+  jobberClientId?: string;
   title: string;
   clientName: string;
   address?: string;
@@ -158,7 +163,7 @@ export interface Transaction {
 
 export interface NoteRecord {
   id: string;
-  entityType: 'job' | 'quote' | 'invoice' | 'lead' | 'task';
+  entityType: 'job' | 'quote' | 'invoice' | 'lead' | 'task' | 'customer';
   entityId: string;
   body: string;
   createdBy?: string;
@@ -191,4 +196,28 @@ export interface QuoteReviewRecord {
   classification: QuoteClassification;
   note?: string;
   reviewedAt: string;
+}
+
+/** A real client relationship, keyed on Jobber's stable client id. */
+export interface Customer {
+  id: string;
+  jobberClientId: string;
+  name: string;
+  email?: string;
+  phone?: string;
+  createdAt: string;
+  updatedAt: string;
+}
+
+/** One recorded sync execution — the truth of "when did we last sync". */
+export interface SyncRun {
+  id: number;
+  source: 'jobber' | 'quickbooks';
+  ranAt: string;
+  ok: boolean;
+  jobs: number;
+  quotes: number;
+  invoices: number;
+  leads: number;
+  errors: string[];
 }
