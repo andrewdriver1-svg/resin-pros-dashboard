@@ -6,7 +6,7 @@ import {
   getJobs,
   getLeads,
   getQuotes,
-  getQuoteReviews,
+  getQuoteReviews, getSyncRuns,
   getTasks,
   getTodos,
   getTransactions,
@@ -25,7 +25,7 @@ export const dynamic = 'force-dynamic';
  */
 
 const loadAll = cache(async () => {
-  const [jobs, quotes, invoices, leads, transactions, todos, tasks, attentionStates, quoteReviews] = await Promise.all([
+  const [jobs, quotes, invoices, leads, transactions, todos, tasks, attentionStates, quoteReviews, syncRuns] = await Promise.all([
     getJobs(),
     getQuotes(),
     getInvoices(),
@@ -35,8 +35,10 @@ const loadAll = cache(async () => {
     getTasks(),
     getAttentionStates(),
     getQuoteReviews(),
+    getSyncRuns('jobber', 1),
   ]);
-  return { jobs, quotes, invoices, leads, transactions, todos, tasks, attentionStates, quoteReviews };
+  const jobberSync = syncRuns[0] ? { ranAt: syncRuns[0].ranAt, ok: syncRuns[0].ok } : null;
+  return { jobs, quotes, invoices, leads, transactions, todos, tasks, attentionStates, quoteReviews, jobberSync };
 });
 
 export default function CommandCenterPage() {
