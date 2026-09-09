@@ -1,4 +1,5 @@
 import { NextResponse, type NextRequest } from 'next/server';
+import { createSupabaseAdminClient } from '@/lib/supabase/admin';
 import { syncAll } from '@/lib/jobber/sync';
 import { isQuickBooksConfigured } from '@/lib/quickbooks/client';
 import { syncQuickBooks, type QuickBooksSyncResult } from '@/lib/quickbooks/sync';
@@ -36,6 +37,14 @@ export async function GET(request: NextRequest) {
     quickbooks = await syncQuickBooks();
     // "not connected" just means Andrew hasn't clicked Connect yet — not an error.
     quickbooks.errors = quickbooks.errors.filter((e) => e !== 'QuickBooks is not connected.');
+    // Record the run so the Systems indicator reads truth, not a proxy.
+    const admin = createSupabaseAdminClient();
+    if (admin) {
+      const { error } = await admin
+        .from('sync_runs')
+        .insert({ source: 'quickbooks', ok: quickbooks.errors.length === 0, errors: quickbooks.errors });
+      if (error) console.warn(`[quickbooks] could not record sync run: ${error.message}`);
+    }
   }
 
   const ok = result.errors.length === 0 && (quickbooks?.errors.length ?? 0) === 0;
