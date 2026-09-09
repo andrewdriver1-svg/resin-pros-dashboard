@@ -110,7 +110,7 @@ const taskInput = z.object({
   priority: z.enum(['low', 'normal', 'high', 'urgent']).default('normal'),
   dueDate: dateOnly.optional(),
   dueAt: isoInstant.optional(),
-  entityType: z.enum(['job', 'quote', 'invoice', 'lead']).optional(),
+  entityType: z.enum(['job', 'quote', 'invoice', 'lead', 'customer']).optional(),
   entityId: uuid.optional(),
   isPersonal: z.boolean().default(false),
   source: z.enum(['manual', 'attention', 'job']).default('manual'),
@@ -124,7 +124,15 @@ async function verifyEntity(
   entityId: string,
 ): Promise<boolean> {
   const table =
-    entityType === 'job' ? 'jobs' : entityType === 'quote' ? 'quotes' : entityType === 'invoice' ? 'invoices' : 'leads';
+    entityType === 'job'
+      ? 'jobs'
+      : entityType === 'quote'
+        ? 'quotes'
+        : entityType === 'invoice'
+          ? 'invoices'
+          : entityType === 'customer'
+            ? 'customers'
+            : 'leads';
   const { data } = await supabase.from(table).select('id').eq('id', entityId).maybeSingle();
   return Boolean(data);
 }
@@ -368,7 +376,7 @@ export async function deleteEvent(id: string): Promise<OpResult> {
 // ── notes ────────────────────────────────────────────────────────────────────
 
 const noteInput = z.object({
-  entityType: z.enum(['job', 'quote', 'invoice', 'lead', 'task']),
+  entityType: z.enum(['job', 'quote', 'invoice', 'lead', 'task', 'customer']),
   entityId: uuid,
   body: z.string().trim().min(1).max(8000),
 });
@@ -502,4 +510,44 @@ export async function classifyQuote(raw: z.input<typeof classifyInput>): Promise
   });
   refresh();
   return { ok: true };
+}
+
+// ── manual sync (§C.2) ───────────────────────────────────────────────────────
+
+/**
+ * Run a Jobber sync on demand. Membership-gated like every action; the sync
+ * itself runs with the service role (same code path as cron + webhook) and
+ * records a sync_runs row, so the Systems indicator reflects it immediately.
+ * Read-only with respect to Jobber — it PULLS; it never writes back.
+ */
+export async function runJobberSyncNow(): Promise<OpResult & { counts?: Record<string, number> }> {
+  if (!isSupabaseConfigured()) return NOT_CONFIGURED;
+  const auth = await requireMember();
+  if ('error' in auth) return auth.error;
+
+  const { syncAll } = await import('@/lib/jobber/sync');
+  const result = await syncAll();
+  const ok = result.errors.length === 0;
+
+  await record(auth.supabase, auth.userId, {
+    action: 'sync.run',
+    verb: 'sync.ran',
+    summary: ok
+      ? `Ran Jobber sync (${result.jobs} jobs, ${result.quotes} quotes, ${result.invoices} invoices, ${result.leads} leads, ${result.customers} customers)`
+      : `Jobber sync had issues: ${result.errors.join('; ')}`,
+    newState: result,
+  });
+  refresh();
+  return ok
+    ? {
+        ok: true,
+        counts: {
+          jobs: result.jobs,
+          quotes: result.quotes,
+          invoices: result.invoices,
+          leads: result.leads,
+          customers: result.customers,
+        },
+      }
+    : { ok: false, message: result.errors.join('; ') };
 }
