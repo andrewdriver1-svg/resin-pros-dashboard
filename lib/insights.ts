@@ -366,6 +366,8 @@ export interface AttentionItem {
   linkLabel: string;
   /** Dollar stake, for ordering. */
   value: number;
+  /** System/data-integrity issues that must never sink below the list cap. */
+  urgent?: boolean;
   /** Seen-but-not-fixed: stays visible, rendered muted. */
   acknowledged?: boolean;
   /** Prefill for one-click "create follow-up task". */
@@ -401,6 +403,7 @@ export function computeAttention(
         id: 'sync-jobber',
         severity: 'high',
         title: 'Jobber sync FAILED on its last run',
+        urgent: true,
         detail: `The last attempt ${hoursAgo}h ago recorded errors — numbers below may be stale. Check Settings → Sync.`,
         href: '/settings',
         linkLabel: 'Open settings',
@@ -411,6 +414,7 @@ export function computeAttention(
         id: 'sync-jobber',
         severity: 'high',
         title: 'Jobber sync overdue',
+        urgent: true,
         detail: `No sync recorded for ${Math.floor(hoursAgo / 24)}+ days (expected daily). Job/quote/invoice numbers may be stale.`,
         href: '/settings',
         linkLabel: 'Open settings',
@@ -430,6 +434,7 @@ export function computeAttention(
     items.push({
       id: `inv-${inv.id}`,
       severity: 'high',
+      urgent: paidMismatch || undefined,
       title: paidMismatch
         ? `Invoice ${inv.number || '—'} marked PAID in Jobber but ${money(bal)} balance remains`
         : `Invoice ${inv.number || '—'} · ${money(bal)} overdue`,
@@ -530,9 +535,13 @@ export function computeAttention(
     if (states.get(item.id)?.state === 'acknowledged') item.acknowledged = true;
   }
 
-  // High severity first, then the biggest dollars; acknowledged sink.
+  // Urgent (system/data-integrity) first — a broken gauge or inconsistent
+  // source must never sink below the rendered cap behind big-but-routine
+  // dollar items. Then high severity, then the biggest dollars; acknowledged
+  // sink regardless.
   return visible.sort((a, b) => {
     if (Boolean(a.acknowledged) !== Boolean(b.acknowledged)) return a.acknowledged ? 1 : -1;
+    if (Boolean(a.urgent) !== Boolean(b.urgent)) return a.urgent ? -1 : 1;
     return a.severity !== b.severity ? (a.severity === 'high' ? -1 : 1) : b.value - a.value;
   });
 }

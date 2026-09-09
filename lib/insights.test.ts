@@ -280,6 +280,23 @@ describe('sync + source-mismatch attention (C.2)', () => {
     expect(noLog.some((i) => i.id === 'sync-jobber')).toBe(false);
   });
 
+  it('ranks integrity issues above bigger-dollar routine items (never below a list cap)', () => {
+    const items = computeAttention(
+      {
+        jobs: [],
+        quotes: [quote({ id: 'big', issuedAt: '2026-08-01', amount: 286_000 })], // huge stale quote
+        invoices: [inv({ id: 'x', status: 'paid', amount: 22_700, amountPaid: 11_350, dueAt: '2026-06-01' })],
+        leads: [],
+        todos: [],
+        jobberSync: { ranAt: '2026-09-04T16:00:00Z', ok: true }, // overdue
+      },
+      NOW,
+    );
+    // Both integrity items outrank the far bigger routine quote.
+    expect(items.slice(0, 2).map((i) => i.id).sort()).toEqual(['inv-x', 'sync-jobber']);
+    expect(items[2].id).toBe('quote-big');
+  });
+
   it('calls out a PAID invoice that still carries a balance as a source mismatch', () => {
     const items = computeAttention(
       {
