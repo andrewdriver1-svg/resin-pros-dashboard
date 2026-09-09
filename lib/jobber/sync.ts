@@ -136,6 +136,7 @@ export function mapJobberJob(node: JobberJobNode): Job | null {
   return {
     id: node.id,
     jobberId: node.id,
+    jobberClientId: typeof node.client?.id === 'string' && node.client.id ? node.client.id : undefined,
     title: typeof node.title === 'string' && node.title ? node.title : `Job ${node.jobNumber ?? ''}`.trim(),
     clientName: clientName(node.client, node.id, 'job'),
     address: addressString(node.property),
@@ -154,6 +155,7 @@ export function mapJobberQuote(node: JobberQuoteNode): Quote | null {
   return {
     id: node.id,
     jobberId: node.id,
+    jobberClientId: typeof node.client?.id === 'string' && node.client.id ? node.client.id : undefined,
     number: numberString(node.quoteNumber, 'Q-') || node.id,
     clientName: clientName(node.client, node.id, 'quote'),
     status: mapQuoteStatus(node.quoteStatus),
@@ -181,6 +183,7 @@ export function mapJobberInvoice(node: JobberInvoiceNode): Invoice | null {
   return {
     id: node.id,
     jobberId: node.id,
+    jobberClientId: typeof node.client?.id === 'string' && node.client.id ? node.client.id : undefined,
     number: numberString(node.invoiceNumber, 'INV-') || node.id,
     clientName: clientName(node.client, node.id, 'invoice'),
     status: mapInvoiceStatus(node.invoiceStatus),
@@ -199,6 +202,7 @@ export function mapJobberRequest(node: JobberRequestNode): Lead | null {
   return {
     id: node.id,
     jobberId: node.id,
+    jobberClientId: typeof node.client?.id === 'string' && node.client.id ? node.client.id : undefined,
     clientName: clientName(node.client, node.id, 'request'),
     contactEmail: firstEmail(node.client),
     contactPhone: firstPhone(node.client),
@@ -234,7 +238,39 @@ export interface SyncResult {
   quotes: number;
   invoices: number;
   leads: number;
+  customers: number;
   errors: string[];
+}
+
+/** A customer row derived from the client refs riding on synced nodes. */
+interface CustomerUpsert {
+  jobber_client_id: string;
+  name: string;
+  email?: string | null;
+  phone?: string | null;
+}
+
+/**
+ * Collect distinct clients seen across all synced nodes. Later sightings fill
+ * in blanks (email/phone come only from request nodes) but never overwrite a
+ * real name with "Unknown client".
+ */
+function collectCustomers(
+  into: Map<string, CustomerUpsert>,
+  nodes: { client?: JobberClientRef }[],
+): void {
+  for (const node of nodes) {
+    const id = node.client?.id;
+    if (typeof id !== 'string' || !id) continue;
+    const existing = into.get(id) ?? { jobber_client_id: id, name: 'Unknown client' };
+    const name = node.client?.name;
+    if (typeof name === 'string' && name && existing.name === 'Unknown client') existing.name = name;
+    const email = firstEmail(node.client);
+    if (email && !existing.email) existing.email = email;
+    const phone = firstPhone(node.client);
+    if (phone && !existing.phone) existing.phone = phone;
+    into.set(id, existing);
+  }
 }
 
 /**
@@ -242,7 +278,7 @@ export interface SyncResult {
  * Each entity is isolated: a failure in one is recorded and the rest continue.
  */
 export async function syncAll(): Promise<SyncResult> {
-  const result: SyncResult = { jobs: 0, quotes: 0, invoices: 0, leads: 0, errors: [] };
+  const result: SyncResult = { jobs: 0, quotes: 0, invoices: 0, leads: 0, customers: 0, errors: [] };
   const admin = createSupabaseAdminClient();
   if (!admin) {
     result.errors.push('Supabase service role not configured — nothing to sync into.');
@@ -251,18 +287,24 @@ export async function syncAll(): Promise<SyncResult> {
   const client = await JobberClient.fromStoredTokens();
   if (!client) {
     result.errors.push('Jobber not connected — no stored OAuth tokens.');
+    await recordSyncRun(admin, result);
     return result;
   }
 
-  async function step<T>(
+  const customers = new Map<string, CustomerUpsert>();
+
+  async function step<T extends { client?: JobberClientRef }>(
     label: 'jobs' | 'quotes' | 'invoices' | 'leads',
     fetch: () => Promise<T[]>,
+    toRows: (nodes: T[]) => Record<string, unknown>[],
     table: string,
   ): Promise<void> {
     try {
-      const rows = await fetch();
+      const nodes = await fetch();
+      collectCustomers(customers, nodes);
+      const rows = toRows(nodes);
       if (rows.length === 0) return;
-      const { error } = await admin!.from(table).upsert(rows as Record<string, unknown>[], { onConflict: 'jobber_id' });
+      const { error } = await admin!.from(table).upsert(rows, { onConflict: 'jobber_id' });
       if (error) throw new Error(error.message);
       result[label] = rows.length;
     } catch (err) {
@@ -272,26 +314,67 @@ export async function syncAll(): Promise<SyncResult> {
 
   await step(
     'jobs',
-    async () => (await fetchConnection<JobberJobNode>(client, JOBS_QUERY, 'jobs')).map(mapJobberJob).filter(Boolean).map(toJobRow),
+    () => fetchConnection<JobberJobNode>(client, JOBS_QUERY, 'jobs'),
+    (nodes) => nodes.map(mapJobberJob).filter(Boolean).map(toJobRow),
     'jobs',
   );
   await step(
     'quotes',
-    async () => (await fetchConnection<JobberQuoteNode>(client, QUOTES_QUERY, 'quotes')).map(mapJobberQuote).filter(Boolean).map(toQuoteRow),
+    () => fetchConnection<JobberQuoteNode>(client, QUOTES_QUERY, 'quotes'),
+    (nodes) => nodes.map(mapJobberQuote).filter(Boolean).map(toQuoteRow),
     'quotes',
   );
   await step(
     'invoices',
-    async () => (await fetchConnection<JobberInvoiceNode>(client, INVOICES_QUERY, 'invoices')).map(mapJobberInvoice).filter(Boolean).map(toInvoiceRow),
+    () => fetchConnection<JobberInvoiceNode>(client, INVOICES_QUERY, 'invoices'),
+    (nodes) => nodes.map(mapJobberInvoice).filter(Boolean).map(toInvoiceRow),
     'invoices',
   );
   await step(
     'leads',
-    async () => (await fetchConnection<JobberRequestNode>(client, REQUESTS_QUERY, 'requests')).map(mapJobberRequest).filter(Boolean).map(toLeadRow),
+    () => fetchConnection<JobberRequestNode>(client, REQUESTS_QUERY, 'requests'),
+    (nodes) => nodes.map(mapJobberRequest).filter(Boolean).map(toLeadRow),
     'leads',
   );
 
+  // Upsert the customer entities derived from the client refs above. Runs even
+  // when a step failed — whatever was seen is still real.
+  if (customers.size > 0) {
+    try {
+      const { error } = await admin
+        .from('customers')
+        .upsert(Array.from(customers.values()) as unknown as Record<string, unknown>[], { onConflict: 'jobber_client_id' });
+      if (error) throw new Error(error.message);
+      result.customers = customers.size;
+    } catch (err) {
+      // A missing customers table (migration not yet run) must not fail the sync.
+      result.errors.push(`customers: ${(err as Error).message}`);
+    }
+  }
+
+  await recordSyncRun(admin, result);
   return result;
+}
+
+/**
+ * Record the run in sync_runs — the truth the Systems indicator reads.
+ * Best-effort: an insert failure (e.g. migration not yet applied) is logged,
+ * never thrown, and never counted as a sync error.
+ */
+async function recordSyncRun(
+  admin: NonNullable<ReturnType<typeof createSupabaseAdminClient>>,
+  result: SyncResult,
+): Promise<void> {
+  const { error } = await admin.from('sync_runs').insert({
+    source: 'jobber',
+    ok: result.errors.length === 0,
+    jobs: result.jobs,
+    quotes: result.quotes,
+    invoices: result.invoices,
+    leads: result.leads,
+    errors: result.errors,
+  });
+  if (error) console.warn(`[jobber] could not record sync run: ${error.message}`);
 }
 
 // ── domain → Supabase row (snake_case) ───────────────────────────────────────
@@ -299,6 +382,7 @@ function toJobRow(j: Job | null): Record<string, unknown> {
   const job = j!;
   return {
     jobber_id: job.jobberId,
+    jobber_client_id: job.jobberClientId ?? null,
     title: job.title,
     client_name: job.clientName,
     address: job.address ?? null,
@@ -312,6 +396,7 @@ function toQuoteRow(q: Quote | null): Record<string, unknown> {
   const quote = q!;
   return {
     jobber_id: quote.jobberId,
+    jobber_client_id: quote.jobberClientId ?? null,
     number: quote.number,
     client_name: quote.clientName,
     status: quote.status,
@@ -323,6 +408,7 @@ function toInvoiceRow(i: Invoice | null): Record<string, unknown> {
   const inv = i!;
   return {
     jobber_id: inv.jobberId,
+    jobber_client_id: inv.jobberClientId ?? null,
     number: inv.number,
     client_name: inv.clientName,
     status: inv.status,
@@ -336,6 +422,7 @@ function toLeadRow(l: Lead | null): Record<string, unknown> {
   const lead = l!;
   return {
     jobber_id: lead.jobberId,
+    jobber_client_id: lead.jobberClientId ?? null,
     client_name: lead.clientName,
     contact_email: lead.contactEmail ?? null,
     contact_phone: lead.contactPhone ?? null,
