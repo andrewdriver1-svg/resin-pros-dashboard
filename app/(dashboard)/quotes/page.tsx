@@ -15,7 +15,7 @@ export const dynamic = 'force-dynamic';
  * ?view=overdue narrows invoices to past-due balances;
  * ?view=stale narrows quotes to 7+ days with no answer.
  */
-type Filters = { q?: string; view?: string };
+type Filters = { q?: string; view?: string; sort?: string };
 
 const DAY_MS = 86_400_000;
 
@@ -24,8 +24,8 @@ export default async function QuotesPage({ searchParams }: { searchParams: Promi
   return (
     <div className="space-y-6">
       <PageHeader title="Quotes & Invoices" description="Outstanding proposals and receivables." />
-      <Suspense fallback={<StatGridSkeleton tiles={3} />}>
-        <MoneyStats />
+      <Suspense fallback={<StatGridSkeleton tiles={filters.view === 'stale' ? 5 : 3} />}>
+        {filters.view === 'stale' ? <PipelineTruth /> : <MoneyStats />}
       </Suspense>
       <Suspense fallback={<TableSkeleton rows={5} />}>
         <Quotes filters={filters} />
@@ -77,6 +77,49 @@ async function MoneyStats() {
   );
 }
 
+/**
+ * Pipeline truth (§C.2): five numbers, one honest story. RAW is exactly what
+ * Jobber reports and is never replaced; every other figure is internal
+ * judgment layered on top of it. ADJUSTED = raw minus written-off; AWAITING
+ * REVIEW = open value with no classification yet; FOLLOW-UP = value the owner
+ * has committed to chase; WRITTEN OFF = likely-dead + known-lost.
+ */
+async function PipelineTruth() {
+  const [quotes, reviews] = await Promise.all([getQuotes(), getQuoteReviews()]);
+  const open = quotes.filter((q) => q.status === 'awaiting_response');
+  const sum = (pred: (q: (typeof open)[number]) => boolean) => {
+    const rows = open.filter(pred);
+    return { v: rows.reduce((s, q) => s + q.amount, 0), n: rows.length };
+  };
+  const cls = (q: { id: string }) => reviews.get(q.id)?.classification;
+  const raw = sum(() => true);
+  const written = sum((q) => cls(q) === 'likely_dead' || cls(q) === 'known_lost');
+  const knownLost = sum((q) => cls(q) === 'known_lost');
+  const likelyDead = sum((q) => cls(q) === 'likely_dead');
+  const followUp = sum((q) => cls(q) === 'follow_up');
+  const unreviewed = sum((q) => !reviews.has(q.id));
+  const adjusted = raw.v - written.v;
+
+  return (
+    <StatGrid>
+      <StatTile label="Raw open pipeline" value={formatMoney(raw.v)} hint={`${raw.n} awaiting response — Jobber's number, never changed`} />
+      <StatTile label="Adjusted active" value={formatMoney(adjusted)} hint={`${raw.n - written.n} quotes after internal review`} />
+      <StatTile
+        label="Awaiting review"
+        value={formatMoney(unreviewed.v)}
+        hint={unreviewed.n === 0 ? 'Queue clear — every quote classified' : `${unreviewed.n} quotes not yet classified`}
+        tone={unreviewed.n > 0 ? 'negative' : 'positive'}
+      />
+      <StatTile label="Follow-up value" value={formatMoney(followUp.v)} hint={`${followUp.n} quotes you're chasing`} />
+      <StatTile
+        label="Written off (internal)"
+        value={formatMoney(written.v)}
+        hint={`${likelyDead.n} likely dead (${formatMoney(likelyDead.v)}) · ${knownLost.n} known lost (${formatMoney(knownLost.v)})`}
+      />
+    </StatGrid>
+  );
+}
+
 function JobLink({ jobId, children }: { jobId?: string; children: React.ReactNode }) {
   if (!jobId) return <span className="text-ink-4">—</span>;
   return (
@@ -90,8 +133,9 @@ async function Quotes({ filters }: { filters: Filters }) {
   const [quotes, reviews] = await Promise.all([getQuotes(), getQuoteReviews()]);
   const reviewMode = filters.view === 'stale';
   const q = (filters.q ?? '').trim();
-  const staleCutoff = Date.now() - 7 * DAY_MS;
-  const visible = quotes
+  const now = Date.now();
+  const staleCutoff = now - 7 * DAY_MS;
+  let visible = quotes
     .filter((quote) => !q || matchesQ(q, quote.number, quote.clientName))
     .filter(
       (quote) =>
@@ -100,12 +144,55 @@ async function Quotes({ filters }: { filters: Filters }) {
     );
   const filtered = Boolean(q || filters.view === 'stale');
 
+  // Review-mode ordering (§C.2): unreviewed first, then the chosen priority —
+  // dollar value (default) or age. The owner's time goes to the biggest,
+  // oldest unanswered money first.
+  const sort = filters.sort === 'age' ? 'age' : 'value';
+  const ageOf = (iso?: string) => (iso ? Math.floor((now - new Date(iso).getTime()) / DAY_MS) : 0);
+  if (reviewMode) {
+    visible = [...visible].sort((a, b) => {
+      const ra = reviews.has(a.id) ? 1 : 0;
+      const rb = reviews.has(b.id) ? 1 : 0;
+      if (ra !== rb) return ra - rb; // unreviewed on top
+      return sort === 'age' ? ageOf(b.issuedAt) - ageOf(a.issuedAt) : b.amount - a.amount;
+    });
+  }
+  const reviewedCount = reviewMode ? visible.filter((quote) => reviews.has(quote.id)).length : 0;
+  const unreviewedValue = reviewMode
+    ? visible.filter((quote) => !reviews.has(quote.id)).reduce((s, quote) => s + quote.amount, 0)
+    : 0;
+
   return (
-    <Card title={reviewMode ? 'Stale quote review (7+ days, no answer)' : 'Quotes'}>
+    <Card
+      title={reviewMode ? 'Stale quote review (7+ days, no answer)' : 'Quotes'}
+      actions={
+        reviewMode ? (
+          <span className="flex items-center gap-2 text-xs">
+            <span className="text-ink-4">Sort:</span>
+            <Link
+              href="/quotes?view=stale&sort=value"
+              className={`font-medium ${sort === 'value' ? 'text-accent' : 'text-ink-3 hover:text-accent'}`}
+            >
+              $ value
+            </Link>
+            <Link
+              href="/quotes?view=stale&sort=age"
+              className={`font-medium ${sort === 'age' ? 'text-accent' : 'text-ink-3 hover:text-accent'}`}
+            >
+              Age
+            </Link>
+          </span>
+        ) : undefined
+      }
+    >
       {reviewMode && (
         <p className="mb-3 text-xs leading-snug text-ink-4">
-          Classify each quote to clean the pipeline. Classifications are internal — nothing changes in Jobber, and the
-          raw number is preserved. “Follow up” also opens a prefilled task.
+          Classify each quote to clean the pipeline — unreviewed quotes sort to the top,{' '}
+          <span className="text-ink-2">
+            {reviewedCount}/{visible.length} reviewed · {formatMoney(unreviewedValue)} still awaiting your judgment
+          </span>
+          . Classifications are internal — nothing changes in Jobber, and the raw number is preserved. “Follow up” also
+          opens a prefilled task.
         </p>
       )}
       {filtered && <FilterBanner shown={visible.length} total={quotes.length} label="quotes" />}
@@ -122,6 +209,7 @@ async function Quotes({ filters }: { filters: Filters }) {
                 <th scope="col" className="px-3 py-2 font-medium">Quote</th>
                 <th scope="col" className="px-3 py-2 font-medium">Client</th>
                 <th scope="col" className="px-3 py-2 font-medium">Issued</th>
+                {reviewMode && <th scope="col" className="px-3 py-2 font-medium">Age</th>}
                 <th scope="col" className="px-3 py-2 font-medium">Job</th>
                 <th scope="col" className="px-3 py-2 font-medium">Status</th>
                 {reviewMode && <th scope="col" className="px-3 py-2 font-medium">Internal review</th>}
@@ -134,6 +222,11 @@ async function Quotes({ filters }: { filters: Filters }) {
                   <td className="px-3 py-2.5 font-medium text-ink">{quote.number}</td>
                   <td className="px-3 py-2.5 text-ink-2">{quote.clientName}</td>
                   <td className="whitespace-nowrap px-3 py-2.5 text-ink-3">{formatDate(quote.issuedAt)}</td>
+                  {reviewMode && (
+                    <td className={`whitespace-nowrap px-3 py-2.5 font-medium tabular-nums ${ageOf(quote.issuedAt) >= 90 ? 'text-warn' : 'text-ink-2'}`}>
+                      {ageOf(quote.issuedAt)}d
+                    </td>
+                  )}
                   <td className="px-3 py-2.5"><JobLink jobId={quote.jobId}>View</JobLink></td>
                   <td className="px-3 py-2.5"><StatusBadge status={quote.status} /></td>
                   {reviewMode && (
