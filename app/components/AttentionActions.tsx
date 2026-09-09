@@ -11,6 +11,7 @@ import { useRef, useTransition } from 'react';
 import { useRouter } from 'next/navigation';
 import { setAttentionState } from '@/lib/actions/ops';
 import type { AttentionItem } from '@/lib/insights';
+import { shiftBusinessDay } from '@/lib/tasks';
 import { openTaskForm } from './os-events';
 
 export function AttentionActions({ item }: { item: AttentionItem }) {
@@ -42,7 +43,7 @@ export function AttentionActions({ item }: { item: AttentionItem }) {
           onClick={() =>
             openTaskForm({
               title: item.followUp!.title,
-              dueDate: new Date(Date.now() + 86_400_000).toISOString().slice(0, 10),
+              dueDate: shiftBusinessDay(1),
               entityType: item.followUp!.entityType,
               entityId: item.followUp!.entityId,
               entityLabel: item.title,

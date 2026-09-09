@@ -11,7 +11,7 @@ import { useEffect, useRef, useState, useTransition } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { addNote, completeTask, reopenTask, updateTask } from '@/lib/actions/ops';
-import { dueLabel, isActionable, type Task } from '@/lib/tasks';
+import { dueLabel, isActionable, shiftBusinessDay, type Task } from '@/lib/tasks';
 import { formatDate, formatDateTime, formatMoney, humanizeStatus } from './format';
 import { StatusBadge } from './ui';
 import { OPEN_DRAWER_EVENT, openTaskForm, type DrawerPayload } from './os-events';
@@ -183,7 +183,7 @@ function TaskDrawer({ task, onClose }: { task: Task; onClose: () => void }) {
 }
 
 function shiftDate(days: number): string {
-  return new Date(Date.now() + days * 86_400_000).toISOString().slice(0, 10);
+  return shiftBusinessDay(days);
 }
 
 // ── job ──────────────────────────────────────────────────────────────────────

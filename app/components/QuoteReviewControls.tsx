@@ -11,6 +11,7 @@ import { useTransition } from 'react';
 import { useRouter } from 'next/navigation';
 import { classifyQuote } from '@/lib/actions/ops';
 import type { QuoteClassification } from '@/lib/db/types';
+import { shiftBusinessDay } from '@/lib/tasks';
 import { openTaskForm } from './os-events';
 
 const OPTIONS: { value: QuoteClassification; label: string }[] = [
@@ -41,7 +42,7 @@ export function QuoteReviewControls({
       if (classification === 'follow_up') {
         openTaskForm({
           title: `Follow up Quote ${quoteNumber} — ${clientName}`,
-          dueDate: new Date(Date.now() + 86_400_000).toISOString().slice(0, 10),
+          dueDate: shiftBusinessDay(1),
           entityType: 'quote',
           entityId: quoteId,
           entityLabel: `Quote ${quoteNumber} · ${clientName}`,
