@@ -50,6 +50,15 @@ export function dayKey(input: string | number | Date, tz: string = businessConfi
   return `${y}-${String(m).padStart(2, '0')}-${String(d).padStart(2, '0')}`;
 }
 
+/**
+ * Today + N days as a YYYY-MM-DD key, anchored to the BUSINESS day — never the
+ * browser's UTC date. At 9 PM ET "tomorrow" must mean the next business day,
+ * not UTC-today + 1 (which lands a day late).
+ */
+export function shiftBusinessDay(days: number, now: Date = new Date()): string {
+  return new Date(Date.parse(dayKey(now)) + days * 86_400_000).toISOString().slice(0, 10);
+}
+
 /** The day a task belongs to, if it has one. */
 export function taskDayKey(t: Task): string | null {
   if (t.dueAt) return dayKey(t.dueAt);

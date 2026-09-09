@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { dueLabel, groupTasks, labelTasks, parseQuickTask, taskDayKey, type Task } from './tasks';
+import { dueLabel, groupTasks, labelTasks, parseQuickTask, shiftBusinessDay, taskDayKey, type Task } from './tasks';
 
 // Tue Sep 8 2026, noon ET.
 const NOW = new Date('2026-09-08T16:00:00Z');
@@ -92,6 +92,18 @@ describe('parseQuickTask', () => {
 
   it('leaves titles without a day word untouched', () => {
     expect(parseQuickTask('order grinder diamonds', NOW)).toEqual({ title: 'order grinder diamonds' });
+  });
+});
+
+describe('shiftBusinessDay', () => {
+  it('anchors "tomorrow" to the business day, not the UTC date', () => {
+    // 8:49 PM ET on Sep 8 is already Sep 9 in UTC — tomorrow must still be Sep 9.
+    const eveningEt = new Date('2026-09-09T00:49:00Z');
+    expect(shiftBusinessDay(1, eveningEt)).toBe('2026-09-09');
+    expect(shiftBusinessDay(0, eveningEt)).toBe('2026-09-08');
+    expect(shiftBusinessDay(7, eveningEt)).toBe('2026-09-15');
+    // Midday there is no divergence.
+    expect(shiftBusinessDay(1, NOW)).toBe('2026-09-09');
   });
 });
 
