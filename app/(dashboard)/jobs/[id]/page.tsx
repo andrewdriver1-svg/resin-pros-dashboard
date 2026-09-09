@@ -1,7 +1,7 @@
 import Link from 'next/link';
 import { notFound } from 'next/navigation';
 import { getCategory } from '@/config/business.config';
-import { getJob, getNotes, getTasks } from '@/lib/db';
+import { getCustomers, getJob, getNotes, getTasks } from '@/lib/db';
 import { sumAmount } from '@/lib/spending';
 import { isActionable } from '@/lib/tasks';
 import { formatMoney, formatDate } from '@/app/components/format';
@@ -14,7 +14,7 @@ export const dynamic = 'force-dynamic';
 
 export default async function JobDetailPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
-  const [job, allTasks, allNotes] = await Promise.all([getJob(id), getTasks(), getNotes()]);
+  const [job, allTasks, allNotes, customers] = await Promise.all([getJob(id), getTasks(), getNotes(), getCustomers()]);
   if (!job) notFound();
 
   const jobTasks = allTasks
@@ -24,6 +24,7 @@ export default async function JobDetailPage({ params }: { params: Promise<{ id: 
   const doneTasks = jobTasks.filter((t) => !isActionable(t)).slice(0, 5);
   const jobNotes = allNotes.filter((n) => n.entityType === 'job' && n.entityId === id);
 
+  const customer = job.jobberClientId ? customers.find((c) => c.jobberClientId === job.jobberClientId) : undefined;
   const totalCost = sumAmount(job.costs);
   const margin = job.value - totalCost;
   const invoicedPaid = job.invoices.reduce((s, i) => s + i.amountPaid, 0);
@@ -36,6 +37,11 @@ export default async function JobDetailPage({ params }: { params: Promise<{ id: 
         description={`${job.clientName}${job.address ? ` · ${job.address}` : ''}`}
         actions={
           <>
+            {customer && (
+              <Link href={`/customers/${customer.id}`} className="text-xs font-medium text-accent hover:underline">
+                View customer →
+              </Link>
+            )}
             <StatusBadge status={job.status} />
             <Link href="/jobs" className="text-xs font-medium text-accent hover:underline">
               ← Back to jobs
