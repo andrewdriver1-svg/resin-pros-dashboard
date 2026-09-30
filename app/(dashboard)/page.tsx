@@ -7,6 +7,7 @@ import {
   getCalendarEvents,
   getInvoices,
   getJobs,
+  getLeadCandidates,
   getLeads,
   getQuotes,
   getQuoteReviews,
@@ -15,15 +16,16 @@ import {
   getTodos,
   getTransactions,
 } from '@/lib/db';
-import { computeAttention, computeBusinessStatus, computePulse } from '@/lib/insights';
+import { computeAttention, computeBusinessStatus, computeKpis, computePulse } from '@/lib/insights';
 import { buildCalendarItems, itemsForDay, type CalendarItem } from '@/lib/calendar';
 import { dayKey, groupTasks, labelTasks, type Task } from '@/lib/tasks';
 import { formatMoney, relativeTime } from '@/app/components/format';
-import { Card, HealthBadge, StatusBadge } from '@/app/components/ui';
-import { EmptyState, TableSkeleton } from '@/app/components/states';
+import { Card, Delta, HealthBadge, StatGrid, StatTile, StatusBadge } from '@/app/components/ui';
+import { EmptyState, TableSkeleton, StatGridSkeleton } from '@/app/components/states';
 import { TaskItem } from '@/app/components/TaskItem';
 import { AttentionList } from '@/app/components/AttentionList';
 import { MarketRadarCard } from '@/app/components/MarketRadarCard';
+import { BusinessFeed } from '@/app/components/BusinessFeed';
 
 export const dynamic = 'force-dynamic';
 
@@ -35,7 +37,7 @@ export const dynamic = 'force-dynamic';
  */
 
 const loadAll = cache(async () => {
-  const [jobs, quotes, invoices, leads, transactions, todos, tasksRaw, events, activity, attentionStates, quoteReviews, syncRuns] =
+  const [jobs, quotes, invoices, leads, transactions, todos, tasksRaw, events, activity, attentionStates, quoteReviews, syncRuns, emailRuns, candidates] =
     await Promise.all([
       getJobs(),
       getQuotes(),
@@ -49,10 +51,13 @@ const loadAll = cache(async () => {
       getAttentionStates(),
       getQuoteReviews(),
       getSyncRuns('jobber', 1),
+      getSyncRuns('email', 1),
+      getLeadCandidates(),
     ]);
   const tasks = labelTasks(tasksRaw, { jobs, quotes, invoices, leads });
   const jobberSync = syncRuns[0] ? { ranAt: syncRuns[0].ranAt, ok: syncRuns[0].ok } : null;
-  return { jobs, quotes, invoices, leads, transactions, todos, tasks, events, activity, attentionStates, quoteReviews, jobberSync };
+  const emailSync = emailRuns[0] ? { ranAt: emailRuns[0].ranAt, ok: emailRuns[0].ok } : null;
+  return { jobs, quotes, invoices, leads, transactions, todos, tasks, events, activity, attentionStates, quoteReviews, jobberSync, emailSync, candidates };
 });
 
 function greeting(now: Date): string {
@@ -85,7 +90,13 @@ export default function TodayPage() {
         <Header dateLine={dateLine} now={now} />
       </Suspense>
 
+      {/* Glance: the whole business in one band of numbers. */}
+      <Suspense fallback={<StatGridSkeleton tiles={6} />}>
+        <Snapshot now={now} />
+      </Suspense>
+
       <div className="grid grid-cols-1 gap-6 xl:grid-cols-3">
+        {/* Decide: today's work, ranked; then what's wrong. */}
         <div className="space-y-6 xl:col-span-2">
           <Suspense fallback={<TableSkeleton rows={4} />}>
             <TodaySchedule now={now} />
@@ -96,10 +107,16 @@ export default function TodayPage() {
           <Suspense fallback={<TableSkeleton rows={4} />}>
             <NeedsAttention now={now} />
           </Suspense>
+          <Suspense fallback={<TableSkeleton rows={4} />}>
+            <BusinessFeed limit={14} />
+          </Suspense>
         </div>
 
         {/* Intelligence rail — deterministic today; Claude takes this surface over in Phase D. */}
         <div className="space-y-6">
+          <Suspense fallback={<TableSkeleton rows={3} />}>
+            <OpportunityInbox />
+          </Suspense>
           <Suspense fallback={<TableSkeleton rows={3} />}>
             <MarketRadarCard />
           </Suspense>
@@ -109,12 +126,116 @@ export default function TodayPage() {
           <Suspense fallback={<TableSkeleton rows={3} />}>
             <JobsNow />
           </Suspense>
-          <Suspense fallback={<TableSkeleton rows={4} />}>
-            <RecentActivity />
-          </Suspense>
         </div>
       </div>
     </div>
+  );
+}
+
+/**
+ * The 6-number snapshot: pipeline, cash owed, pace, work, demand. Each tile
+ * links to the page where the number can be interrogated — glance → decide →
+ * investigate.
+ */
+async function Snapshot({ now }: { now: Date }) {
+  const data = await loadAll();
+  const k = computeKpis(data, now);
+  const openCandidates = data.candidates.filter((c) => c.status === 'new').length;
+
+  return (
+    <StatGrid cols={6}>
+      <Link href="/quotes" className="block">
+        <StatTile
+          label="Pipeline"
+          value={formatMoney(k.adjustedPipeline)}
+          hint={
+            k.adjustedPipeline !== k.pipelineValue
+              ? `raw ${formatMoney(k.pipelineValue)} in Jobber`
+              : `${k.pipelineCount} open quote${k.pipelineCount === 1 ? '' : 's'}`
+          }
+        />
+      </Link>
+      <Link href="/quotes?view=overdue" className="block">
+        <StatTile
+          label="Awaiting payment"
+          value={formatMoney(k.arOutstanding)}
+          hint={k.arOverdueCount > 0 ? `${k.arOverdueCount} overdue · ${formatMoney(k.arOverdue)}` : 'nothing overdue'}
+          tone={k.arOverdueCount > 0 ? 'negative' : 'default'}
+        />
+      </Link>
+      <Link href="/company" className="block">
+        <StatTile
+          label="Invoiced this month"
+          value={formatMoney(k.invoicedMtd)}
+          delta={
+            <Delta
+              label={`${k.invoicedMtd >= k.invoicedPrevPace ? '▲' : '▼'} vs ${formatMoney(k.invoicedPrevPace)} pace`}
+              good={k.invoicedMtd >= k.invoicedPrevPace}
+            />
+          }
+        />
+      </Link>
+      <Link href="/jobs" className="block">
+        <StatTile
+          label="Active jobs"
+          value={String(k.activeJobs)}
+          hint={k.activeJobs > 0 ? formatMoney(k.activeJobsValue) : 'none scheduled'}
+        />
+      </Link>
+      <Link href="/leads" className="block">
+        <StatTile label="New leads" value={String(k.newLeads)} hint="last 7 days" />
+      </Link>
+      <Link href="/opportunities" className="block">
+        <StatTile
+          label="Opportunities"
+          value={String(openCandidates)}
+          hint={openCandidates > 0 ? 'awaiting review' : 'inbox clear'}
+          tone={openCandidates > 0 ? 'positive' : 'default'}
+        />
+      </Link>
+    </StatGrid>
+  );
+}
+
+/** Email-detected leads and bids, queued for owner judgment. */
+async function OpportunityInbox() {
+  const data = await loadAll();
+  const open = data.candidates.filter((c) => c.status === 'new').slice(0, 3);
+
+  return (
+    <Card
+      title="Opportunity inbox"
+      actions={
+        <Link href="/opportunities" className="text-xs font-medium text-accent hover:underline">
+          Review all →
+        </Link>
+      }
+    >
+      {open.length === 0 ? (
+        <p className="py-3 text-center text-xs text-ink-4">
+          No unreviewed opportunities. Detected leads and bid invitations land here.
+        </p>
+      ) : (
+        <ul className="divide-y divide-edge-soft">
+          {open.map((c) => (
+            <li key={c.id}>
+              <Link
+                href={c.emailThreadId ? `/opportunities?thread=${c.emailThreadId}` : '/opportunities'}
+                className="block rounded-lg px-1.5 py-2.5 transition hover:bg-panel-2"
+              >
+                <div className="flex items-center justify-between gap-2">
+                  <span className="truncate text-sm font-medium text-ink">{c.company || c.contactName}</span>
+                  <span className="shrink-0 text-xs text-ink-4">{relativeTime(c.createdAt)}</span>
+                </div>
+                <div className="mt-0.5 truncate text-xs text-ink-4">
+                  {[c.estimatedScope, c.location].filter(Boolean).join(' · ') || c.summary}
+                </div>
+              </Link>
+            </li>
+          ))}
+        </ul>
+      )}
+    </Card>
   );
 }
 
@@ -339,28 +460,3 @@ async function JobsNow() {
   );
 }
 
-async function RecentActivity() {
-  const data = await loadAll();
-  return (
-    <Card title="Recent activity">
-      {data.activity.length === 0 ? (
-        <p className="py-4 text-center text-xs text-ink-4">Actions you take will show up here.</p>
-      ) : (
-        <ul className="space-y-2.5">
-          {data.activity.slice(0, 8).map((a) => (
-            <li key={a.id} className="flex items-start gap-2 text-xs">
-              <span
-                aria-hidden
-                className={`mt-1 h-1.5 w-1.5 shrink-0 rounded-full ${
-                  a.actor === 'human' ? 'bg-accent' : a.actor === 'system' ? 'bg-ink-4' : 'bg-violet-400'
-                }`}
-              />
-              <span className="min-w-0 flex-1 leading-snug text-ink-2">{a.summary}</span>
-              <span className="shrink-0 text-ink-4">{relativeTime(a.createdAt)}</span>
-            </li>
-          ))}
-        </ul>
-      )}
-    </Card>
-  );
-}
