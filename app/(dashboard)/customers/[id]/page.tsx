@@ -3,6 +3,8 @@ import { notFound } from 'next/navigation';
 import {
   getActivity,
   getCustomers,
+  getEmailIntelligence,
+  getEmailThreads,
   getInvoices,
   getJobs,
   getLeads,
@@ -28,7 +30,7 @@ export const dynamic = 'force-dynamic';
  */
 export default async function CustomerPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
-  const [customers, jobs, quotes, invoices, leads, tasksRaw, notes, activity] = await Promise.all([
+  const [customers, jobs, quotes, invoices, leads, tasksRaw, notes, activity, emailThreads, emailIntel] = await Promise.all([
     getCustomers(),
     getJobs(),
     getQuotes(),
@@ -37,6 +39,8 @@ export default async function CustomerPage({ params }: { params: Promise<{ id: s
     getTasks(),
     getNotes(),
     getActivity(200),
+    getEmailThreads(),
+    getEmailIntelligence(),
   ]);
   const customer = customers.find((c) => c.id === id);
   if (!customer) notFound();
@@ -62,6 +66,8 @@ export default async function CustomerPage({ params }: { params: Promise<{ id: s
   const openTasks = tasks.filter(isActionable);
   const cNotes = notes.filter((n) => n.entityId && recordIds.has(n.entityId));
   const cActivity = activity.filter((a) => a.entityId && recordIds.has(a.entityId)).slice(0, 12);
+
+  const cThreads = emailThreads.filter((t) => t.linkedCustomerId === customer.id && t.status !== 'dismissed');
 
   const ar = cInvoices.reduce((s, i) => s + invoiceBalance(i), 0);
   const collected = cInvoices.reduce((s, i) => s + i.amountPaid, 0);
@@ -186,6 +192,33 @@ export default async function CustomerPage({ params }: { params: Promise<{ id: s
             </ul>
           )}
         </Card>
+
+        {cThreads.length > 0 && (
+          <Card title={`Email (${cThreads.length} thread${cThreads.length === 1 ? '' : 's'})`}>
+            <ul className="divide-y divide-edge-soft/60">
+              {cThreads.slice(0, 6).map((t) => {
+                const i = emailIntel.get(t.id);
+                return (
+                  <li key={t.id}>
+                    <Link
+                      href={`/opportunities?thread=${t.id}`}
+                      className="group block rounded-lg px-1 py-2 transition hover:bg-panel-2"
+                    >
+                      <div className="flex items-center justify-between gap-3 text-sm">
+                        <span className="truncate font-medium text-ink group-hover:text-accent">{t.subject || '(no subject)'}</span>
+                        <span className="shrink-0 text-xs text-ink-4">{relativeTime(t.lastMessageAt)}</span>
+                      </div>
+                      {i?.summary && <div className="mt-0.5 truncate text-xs text-ink-4">{i.summary}</div>}
+                    </Link>
+                  </li>
+                );
+              })}
+            </ul>
+            <p className="mt-2 border-t border-edge-soft pt-2 text-xs text-ink-4">
+              Read-only from the business mailbox — open a thread to review it.
+            </p>
+          </Card>
+        )}
 
         <Card title="Recent activity">
           {cActivity.length === 0 ? (
