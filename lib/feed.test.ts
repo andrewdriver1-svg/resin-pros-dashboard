@@ -56,7 +56,7 @@ describe('buildFeed', () => {
     const feed = buildFeed({
       ...empty,
       quotes: [quote({ jobId: 'j9' })],
-      jobs: [job({ completedAt: '2026-09-20T18:00:00.000Z' })],
+      jobs: [job({ status: 'complete', completedAt: '2026-09-20T18:00:00.000Z' })],
       candidates: [
         {
           id: 'c1',
@@ -131,5 +131,21 @@ describe('groupFeedByDay', () => {
     expect(groups).toHaveLength(2);
     expect(groups[0].events).toHaveLength(2); // the UTC-midnight straddler lands on Sep 29 ET
     expect(groups[0].day).toContain('Sep 29');
+  });
+});
+
+describe('feed honesty rules (production findings)', () => {
+  it('never reports a merely scheduled job as completed (Jobber pre-fills end dates)', () => {
+    const feed = buildFeed({
+      ...empty,
+      jobs: [job({ status: 'scheduled', scheduledAt: '2026-10-06T12:00:00.000Z', completedAt: '2026-10-06T20:00:00.000Z' })],
+    });
+    expect(feed.map((e) => e.kind)).toEqual(['job_scheduled']);
+  });
+
+  it('labels a draft quote as drafted, not sent', () => {
+    const feed = buildFeed({ ...empty, quotes: [quote({ status: 'draft' })] });
+    expect(feed[0].title).toBe('Quote Q-295 drafted');
+    expect(feed[0].detail).toBe('draft');
   });
 });

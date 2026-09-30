@@ -101,7 +101,8 @@ export function buildFeed(inputs: FeedInputs, limit = 40): FeedEvent[] {
       id: `quote:${q.id}`,
       kind: 'quote',
       at: q.issuedAt,
-      title: `Quote ${q.number} sent`,
+      // A draft was never sent — say what actually happened.
+      title: q.status === 'draft' ? `Quote ${q.number} drafted` : `Quote ${q.number} sent`,
       subject: q.clientName,
       amount: q.amount,
       detail: QUOTE_STATUS_DETAIL[q.status],
@@ -140,7 +141,11 @@ export function buildFeed(inputs: FeedInputs, limit = 40): FeedEvent[] {
         source: 'jobber',
       });
     }
-    if (valid(j.completedAt)) {
+    // Jobber pre-fills completedAt with the scheduled END date, so a merely
+    // scheduled job would otherwise show as "completed" in the future. Only
+    // report completion when the job's status says the work actually finished.
+    const finished = j.status === 'complete' || j.status === 'invoiced' || j.status === 'paid' || j.status === 'archived';
+    if (valid(j.completedAt) && finished) {
       events.push({
         id: `job:${j.id}:completed`,
         kind: 'job_completed',
