@@ -26,6 +26,7 @@ interface SourceStatus {
 
 const STALE_JOBBER_MS = 36 * 3_600_000; // cron is hourly-ish; 36h means it's broken
 const STALE_QBO_MS = 48 * 3_600_000;
+const STALE_EMAIL_MS = 36 * 3_600_000;
 
 async function getStatuses(): Promise<{ sources: SourceStatus[]; worst: 'good' | 'warn' | 'bad' }> {
   if (!isSupabaseConfigured()) {
@@ -98,6 +99,39 @@ async function getStatuses(): Promise<{ sources: SourceStatus[]; worst: 'good' |
       }
     } catch {
       sources.push({ name: 'QuickBooks', detail: 'Freshness unknown', tone: 'muted' });
+    }
+
+    // Email intelligence — quiet when healthy, honest when not.
+    try {
+      const admin = createSupabaseAdminClient();
+      if (admin) {
+        const { data: account } = await admin.from('email_accounts').select('status, last_error').eq('id', 'primary').maybeSingle();
+        if (!account) {
+          sources.push({ name: 'Email', detail: 'Not connected', tone: 'muted' });
+        } else {
+          const supabase = await createSupabaseServerClient();
+          const { data: run } = await supabase
+            .from('sync_runs')
+            .select('ran_at, ok')
+            .eq('source', 'email')
+            .order('ran_at', { ascending: false })
+            .limit(1)
+            .maybeSingle();
+          const at = run?.ran_at ? new Date(run.ran_at as string).getTime() : null;
+          const failed = account.status === 'error' || run?.ok === false;
+          sources.push({
+            name: 'Email',
+            detail: failed
+              ? `Sync FAILED${at ? ` ${relativeTime(new Date(at).toISOString())}` : ''}`
+              : at
+                ? `Synced ${relativeTime(new Date(at).toISOString())}`
+                : 'Connected — first sync pending',
+            tone: failed ? 'bad' : at ? (Date.now() - at > STALE_EMAIL_MS ? 'warn' : 'good') : 'muted',
+          });
+        }
+      }
+    } catch {
+      sources.push({ name: 'Email', detail: 'Freshness unknown', tone: 'muted' });
     }
   }
 

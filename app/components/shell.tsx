@@ -97,6 +97,13 @@ export function NavIcon({ name }: { name: string }) {
           <path d="M2.5 10.5h3l2-5 3 9 2-6.5 1.5 2.5h3.5" />
         </svg>
       );
+    case 'inbox':
+      return (
+        <svg {...common}>
+          <path d="M2.5 11.5 5 4.5h10l2.5 7v4a1 1 0 0 1-1 1h-13a1 1 0 0 1-1-1z" />
+          <path d="M2.5 11.5h4.5l1 2h4l1-2h4.5" />
+        </svg>
+      );
     case 'search':
       return (
         <svg {...common}>
@@ -134,8 +141,9 @@ const NAV_GROUPS: { label: string; items: { href: string; label: string; icon: s
   {
     label: 'Sales',
     items: [
-      { href: '/customers', label: 'Customers', icon: 'leads' },
+      { href: '/opportunities', label: 'Opportunities', icon: 'inbox' },
       { href: '/leads', label: 'Leads', icon: 'leads' },
+      { href: '/customers', label: 'Customers', icon: 'leads' },
       { href: '/quotes', label: 'Quotes & Invoices', icon: 'quotes' },
     ],
   },
