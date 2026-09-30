@@ -33,12 +33,16 @@ import type {
   ActivityEntry,
   AttentionStateRecord,
   Customer,
+  EmailIntelligenceRecord,
+  EmailMessage,
+  EmailThread,
   GoogleBusinessSnapshot,
   Invoice,
   Job,
   JobCost,
   JobDetail,
   Lead,
+  LeadCandidate,
   MarketingEntry,
   MaterialTodo,
   NoteRecord,
@@ -472,7 +476,7 @@ export function getCustomers(): Promise<Customer[]> {
 }
 
 /** Recorded sync executions, newest first — the truth of "when did we last sync". */
-export async function getSyncRuns(source: 'jobber' | 'quickbooks', limit = 5): Promise<SyncRun[]> {
+export async function getSyncRuns(source: 'jobber' | 'quickbooks' | 'email', limit = 5): Promise<SyncRun[]> {
   const rows = await readList<SyncRun>({
     table: 'sync_runs',
     map: (r) => ({
@@ -484,10 +488,111 @@ export async function getSyncRuns(source: 'jobber' | 'quickbooks', limit = 5): P
       quotes: num(r.quotes),
       invoices: num(r.invoices),
       leads: num(r.leads),
+      messagesScanned: num(r.messages_scanned),
+      messagesRelevant: num(r.messages_relevant),
+      candidatesCreated: num(r.candidates_created),
       errors: Array.isArray(r.errors) ? (r.errors as string[]) : [],
     }),
     fixture: [],
     order: { column: 'ran_at', ascending: false },
   });
   return rows.filter((r) => r.source === source).slice(0, limit);
+}
+
+// ── Phase E: email intelligence reads ────────────────────────────────────────
+
+export function getEmailThreads(): Promise<EmailThread[]> {
+  return readList<EmailThread>({
+    table: 'email_threads',
+    map: (r) => ({
+      id: str(r.id),
+      providerThreadId: str(r.provider_thread_id),
+      subject: str(r.subject),
+      participants: Array.isArray(r.participants) ? (r.participants as EmailThread['participants']) : [],
+      messageCount: num(r.message_count),
+      firstMessageAt: optStr(r.first_message_at),
+      lastMessageAt: optStr(r.last_message_at),
+      status: str(r.status, 'open') as EmailThread['status'],
+      linkedCustomerId: optStr(r.linked_customer_id),
+      linkedEntityType: optStr(r.linked_entity_type) as EmailThread['linkedEntityType'],
+      linkedEntityId: optStr(r.linked_entity_id),
+      linkConfidence: r.link_confidence == null ? undefined : num(r.link_confidence),
+      linkMechanism: optStr(r.link_mechanism),
+      firstDetectedAt: str(r.first_detected_at),
+    }),
+    fixture: [],
+    order: { column: 'last_message_at', ascending: false },
+  });
+}
+
+/** Messages for ONE thread (detail views only — never the whole mailbox). */
+export async function getEmailMessages(threadId: string): Promise<EmailMessage[]> {
+  const all = await readList<EmailMessage>({
+    table: 'email_messages',
+    map: (r) => ({
+      id: str(r.id),
+      providerMessageId: str(r.provider_message_id),
+      threadId: str(r.thread_id),
+      fromAddress: str(r.from_address),
+      fromName: str(r.from_name),
+      toAddresses: Array.isArray(r.to_addresses) ? (r.to_addresses as string[]) : [],
+      sentAt: optStr(r.sent_at),
+      subject: str(r.subject),
+      bodyExtract: str(r.body_extract),
+      hasAttachments: bool(r.has_attachments),
+      attachmentMeta: Array.isArray(r.attachment_meta) ? (r.attachment_meta as EmailMessage['attachmentMeta']) : [],
+    }),
+    fixture: [],
+    order: { column: 'sent_at', ascending: true },
+  });
+  return all.filter((m) => m.threadId === threadId);
+}
+
+/** Derived interpretation per thread, keyed by thread id. */
+export async function getEmailIntelligence(): Promise<Map<string, EmailIntelligenceRecord>> {
+  const rows = await readList<EmailIntelligenceRecord>({
+    table: 'email_intelligence',
+    map: (r) => ({
+      threadId: str(r.thread_id),
+      classification: str(r.classification, 'unknown') as EmailIntelligenceRecord['classification'],
+      summary: str(r.summary),
+      urgency: str(r.urgency, 'normal') as EmailIntelligenceRecord['urgency'],
+      actionRequired: bool(r.action_required),
+      waitingOn: optStr(r.waiting_on) as EmailIntelligenceRecord['waitingOn'],
+      leadLikelihood: num(r.lead_likelihood),
+      detectedCompany: optStr(r.detected_company),
+      detectedLocation: optStr(r.detected_location),
+      detectedScope: optStr(r.detected_scope),
+      confidence: num(r.confidence),
+      mechanism: str(r.mechanism, 'rules:v1'),
+    }),
+    fixture: [],
+  });
+  return new Map(rows.map((r) => [r.threadId, r]));
+}
+
+export function getLeadCandidates(): Promise<LeadCandidate[]> {
+  return readList<LeadCandidate>({
+    table: 'lead_candidates',
+    map: (r) => ({
+      id: str(r.id),
+      source: str(r.source, 'email') as LeadCandidate['source'],
+      sourceRef: optStr(r.source_ref),
+      emailThreadId: optStr(r.email_thread_id),
+      company: str(r.company),
+      contactName: str(r.contact_name),
+      contactEmail: optStr(r.contact_email),
+      contactPhone: optStr(r.contact_phone),
+      summary: str(r.summary),
+      location: optStr(r.location),
+      estimatedScope: optStr(r.estimated_scope),
+      status: str(r.status, 'new') as LeadCandidate['status'],
+      linkedCustomerId: optStr(r.linked_customer_id),
+      linkedTaskId: optStr(r.linked_task_id),
+      createdAt: str(r.created_at),
+      reviewedAt: optStr(r.reviewed_at),
+    }),
+    fixture: [],
+    order: { column: 'created_at', ascending: false },
+  });
 }

@@ -212,12 +212,107 @@ export interface Customer {
 /** One recorded sync execution — the truth of "when did we last sync". */
 export interface SyncRun {
   id: number;
-  source: 'jobber' | 'quickbooks';
+  source: 'jobber' | 'quickbooks' | 'email';
   ranAt: string;
   ok: boolean;
   jobs: number;
   quotes: number;
   invoices: number;
   leads: number;
+  messagesScanned: number;
+  messagesRelevant: number;
+  candidatesCreated: number;
   errors: string[];
+}
+
+// ── Phase E: email intelligence ──────────────────────────────────────────────
+
+export type EmailClassification =
+  | 'new_lead'
+  | 'bid_invitation'
+  | 'existing_customer'
+  | 'existing_quote'
+  | 'existing_job'
+  | 'scheduling'
+  | 'payment_accounting'
+  | 'vendor'
+  | 'internal_admin'
+  | 'newsletter_marketing'
+  | 'unknown';
+
+export type EmailUrgency = 'urgent' | 'normal' | 'low';
+
+export interface EmailParticipant {
+  address: string;
+  name?: string;
+}
+
+export interface EmailThread {
+  id: string;
+  providerThreadId: string;
+  subject: string;
+  participants: EmailParticipant[];
+  messageCount: number;
+  firstMessageAt?: string;
+  lastMessageAt?: string;
+  /** Owner review state — internal, changed only via audited actions. */
+  status: 'open' | 'reviewed' | 'dismissed';
+  linkedCustomerId?: string;
+  linkedEntityType?: 'quote' | 'invoice' | 'job' | 'lead';
+  linkedEntityId?: string;
+  linkConfidence?: number;
+  linkMechanism?: string;
+  firstDetectedAt: string;
+}
+
+export interface EmailMessage {
+  id: string;
+  providerMessageId: string;
+  threadId: string;
+  fromAddress: string;
+  fromName: string;
+  toAddresses: string[];
+  sentAt?: string;
+  subject: string;
+  /** Cleaned plain-text extract, bounded at ingest. */
+  bodyExtract: string;
+  hasAttachments: boolean;
+  attachmentMeta: { filename: string; mimeType: string; size: number }[];
+}
+
+export interface EmailIntelligenceRecord {
+  threadId: string;
+  classification: EmailClassification;
+  summary: string;
+  urgency: EmailUrgency;
+  actionRequired: boolean;
+  waitingOn?: 'us' | 'them';
+  leadLikelihood: number;
+  detectedCompany?: string;
+  detectedLocation?: string;
+  detectedScope?: string;
+  confidence: number;
+  /** 'rules:v1' today; a Claude mechanism later. Interpretation, never source fact. */
+  mechanism: string;
+}
+
+export type LeadCandidateStatus = 'new' | 'reviewed' | 'converted' | 'dismissed';
+
+export interface LeadCandidate {
+  id: string;
+  source: 'email' | 'market_radar' | 'website' | 'manual';
+  sourceRef?: string;
+  emailThreadId?: string;
+  company: string;
+  contactName: string;
+  contactEmail?: string;
+  contactPhone?: string;
+  summary: string;
+  location?: string;
+  estimatedScope?: string;
+  status: LeadCandidateStatus;
+  linkedCustomerId?: string;
+  linkedTaskId?: string;
+  createdAt: string;
+  reviewedAt?: string;
 }
