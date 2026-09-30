@@ -551,3 +551,165 @@ export async function runJobberSyncNow(): Promise<OpResult & { counts?: Record<s
       }
     : { ok: false, message: result.errors.join('; ') };
 }
+
+// ── email intelligence review (§Phase E) ─────────────────────────────────────
+
+const candidateReview = z.object({
+  id: uuid,
+  action: z.enum(['dismiss', 'mark_reviewed', 'create_task', 'link_customer']),
+  customerId: uuid.optional(),
+  /** Optional due date for the created follow-up task. */
+  dueDate: dateOnly.optional(),
+});
+
+/**
+ * Owner judgment on a lead candidate. Dismiss / mark reviewed / spawn a
+ * follow-up task / link to an existing customer. Candidates NEVER auto-become
+ * Jobber leads — conversion into source systems stays with the owner, outside
+ * the OS. Fully audited like every write.
+ */
+export async function reviewLeadCandidate(
+  raw: z.input<typeof candidateReview>,
+): Promise<OpResult> {
+  if (!isSupabaseConfigured()) return NOT_CONFIGURED;
+  const auth = await requireMember();
+  if ('error' in auth) return auth.error;
+  const parsed = candidateReview.safeParse(raw);
+  if (!parsed.success) return { ok: false, message: parsed.error.issues[0]?.message ?? 'Invalid review.' };
+  const input = parsed.data;
+
+  const { data: candidate } = await auth.supabase
+    .from('lead_candidates')
+    .select('*')
+    .eq('id', input.id)
+    .maybeSingle();
+  if (!candidate) return { ok: false, message: 'That candidate doesn’t exist.' };
+
+  let taskId: string | undefined;
+  const patch: Record<string, unknown> = {
+    reviewed_at: new Date().toISOString(),
+    reviewed_by: auth.userId,
+  };
+
+  if (input.action === 'dismiss') {
+    patch.status = 'dismissed';
+  } else if (input.action === 'mark_reviewed') {
+    patch.status = 'reviewed';
+  } else if (input.action === 'create_task') {
+    const title = `Respond: ${candidate.company || candidate.contact_name || 'new inquiry'}`.slice(0, 200);
+    const created = await createTask({
+      title,
+      description: String(candidate.summary ?? '').slice(0, 2000),
+      dueDate: input.dueDate,
+      priority: 'high',
+      source: 'attention',
+    });
+    if (!created.ok) return created;
+    taskId = created.id;
+    patch.status = 'converted';
+    patch.linked_task_id = taskId ?? null;
+  } else if (input.action === 'link_customer') {
+    if (!input.customerId) return { ok: false, message: 'Pick a customer to link.' };
+    if (!(await verifyEntity(auth.supabase, 'customer', input.customerId))) {
+      return { ok: false, message: 'That customer doesn’t exist.' };
+    }
+    patch.status = 'reviewed';
+    patch.linked_customer_id = input.customerId;
+  }
+
+  const { error } = await auth.supabase.from('lead_candidates').update(patch).eq('id', input.id);
+  if (error) return { ok: false, message: `Couldn’t update the candidate: ${error.message}` };
+
+  // Manual customer link also corrects the thread — owner judgment beats rules.
+  if (input.action === 'link_customer' && candidate.email_thread_id) {
+    await auth.supabase
+      .from('email_threads')
+      .update({
+        linked_customer_id: input.customerId,
+        link_confidence: 1,
+        link_mechanism: 'manual',
+      })
+      .eq('id', candidate.email_thread_id);
+  }
+
+  await record(auth.supabase, auth.userId, {
+    action: 'lead_candidate.review',
+    verb: 'lead_candidate.reviewed',
+    summary:
+      input.action === 'dismiss'
+        ? `Dismissed lead candidate "${candidate.company || candidate.contact_name}"`
+        : input.action === 'create_task'
+          ? `Created follow-up task for lead candidate "${candidate.company || candidate.contact_name}"`
+          : input.action === 'link_customer'
+            ? `Linked lead candidate "${candidate.company || candidate.contact_name}" to a customer`
+            : `Reviewed lead candidate "${candidate.company || candidate.contact_name}"`,
+    entityType: 'lead_candidate',
+    entityId: input.id,
+    oldState: { status: candidate.status },
+    newState: patch,
+  });
+  refresh();
+  return { ok: true, id: taskId };
+}
+
+const threadStatusInput = z.object({
+  threadId: uuid,
+  status: z.enum(['open', 'reviewed', 'dismissed']),
+});
+
+/** Owner review state on an email thread. Internal only — the mailbox is untouched. */
+export async function setEmailThreadStatus(raw: z.input<typeof threadStatusInput>): Promise<OpResult> {
+  if (!isSupabaseConfigured()) return NOT_CONFIGURED;
+  const auth = await requireMember();
+  if ('error' in auth) return auth.error;
+  const parsed = threadStatusInput.safeParse(raw);
+  if (!parsed.success) return { ok: false, message: parsed.error.issues[0]?.message ?? 'Invalid status.' };
+
+  const { data: thread } = await auth.supabase
+    .from('email_threads')
+    .select('id, subject, status')
+    .eq('id', parsed.data.threadId)
+    .maybeSingle();
+  if (!thread) return { ok: false, message: 'That conversation doesn’t exist.' };
+
+  const { error } = await auth.supabase
+    .from('email_threads')
+    .update({ status: parsed.data.status })
+    .eq('id', parsed.data.threadId);
+  if (error) return { ok: false, message: `Couldn’t update: ${error.message}` };
+
+  await record(auth.supabase, auth.userId, {
+    action: 'email_thread.status',
+    verb: 'email_thread.reviewed',
+    summary: `Marked conversation "${String(thread.subject).slice(0, 60)}" ${parsed.data.status}`,
+    entityType: 'email_thread',
+    entityId: parsed.data.threadId,
+    oldState: { status: thread.status },
+    newState: { status: parsed.data.status },
+  });
+  refresh();
+  return { ok: true };
+}
+
+/** Owner-triggered email sync — read-only pull, recorded in sync_runs. */
+export async function runEmailSyncNow(): Promise<OpResult & { counts?: Record<string, number> }> {
+  if (!isSupabaseConfigured()) return NOT_CONFIGURED;
+  const auth = await requireMember();
+  if ('error' in auth) return auth.error;
+
+  const { syncEmail } = await import('@/lib/email/ingest');
+  const result = await syncEmail();
+
+  await record(auth.supabase, auth.userId, {
+    action: 'sync.run',
+    verb: 'sync.ran',
+    summary: result.ok
+      ? `Ran email sync (${result.messagesScanned} scanned, ${result.messagesNew} new, ${result.candidatesCreated} lead candidates)`
+      : `Email sync had issues: ${result.errors.join('; ')}`,
+    newState: result,
+  });
+  refresh();
+  return result.ok
+    ? { ok: true, counts: { scanned: result.messagesScanned, new: result.messagesNew, relevant: result.messagesRelevant, candidates: result.candidatesCreated } }
+    : { ok: false, message: result.errors.join('; ') || 'Email sync failed.' };
+}

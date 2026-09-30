@@ -12,7 +12,7 @@
  * (assertReadOnly enforces it at runtime too).
  */
 
-import { getInvoices, getJobs, getLeads, getQuotes, getTransactions } from '@/lib/db';
+import { getCustomers, getEmailThreads, getInvoices, getJobs, getLeadCandidates, getLeads, getQuotes, getTransactions } from '@/lib/db';
 import { getSessionState } from '@/lib/auth/session';
 import { assertReadOnly, buildRecordCommands, type Command } from '@/lib/command';
 
@@ -28,15 +28,18 @@ export async function fetchCommandIndex(): Promise<CommandIndexResult> {
     return { records: [], builtAt: new Date().toISOString() };
   }
 
-  const [leads, jobs, quotes, invoices, transactions] = await Promise.all([
+  const [leads, jobs, quotes, invoices, transactions, customers, candidates, threads] = await Promise.all([
     getLeads(),
     getJobs(),
     getQuotes(),
     getInvoices(),
     getTransactions(),
+    getCustomers(),
+    getLeadCandidates(),
+    getEmailThreads(),
   ]);
 
-  const records = buildRecordCommands({ leads, jobs, quotes, invoices, transactions });
+  const records = buildRecordCommands({ leads, jobs, quotes, invoices, transactions, customers, candidates, threads });
   assertReadOnly(records);
   return { records, builtAt: new Date().toISOString() };
 }
