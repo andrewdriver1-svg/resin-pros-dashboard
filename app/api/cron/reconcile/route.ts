@@ -3,6 +3,8 @@ import { createSupabaseAdminClient } from '@/lib/supabase/admin';
 import { syncAll } from '@/lib/jobber/sync';
 import { isQuickBooksConfigured } from '@/lib/quickbooks/client';
 import { syncQuickBooks, type QuickBooksSyncResult } from '@/lib/quickbooks/sync';
+import { isEmailConfigured, loadEmailAccount } from '@/lib/email/gmail';
+import { syncEmail, type EmailSyncResult } from '@/lib/email/ingest';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
@@ -47,6 +49,15 @@ export async function GET(request: NextRequest) {
     }
   }
 
-  const ok = result.errors.length === 0 && (quickbooks?.errors.length ?? 0) === 0;
-  return NextResponse.json({ ok, ...result, quickbooks }, { status: ok ? 200 : 207 });
+  // Email intelligence: read-only pull. Only when the integration is both
+  // configured AND connected — a never-connected mailbox is not a failure and
+  // must not pollute sync_runs with error rows.
+  let email: EmailSyncResult | null = null;
+  if (isEmailConfigured() && (await loadEmailAccount())) {
+    email = await syncEmail();
+  }
+
+  const ok =
+    result.errors.length === 0 && (quickbooks?.errors.length ?? 0) === 0 && (email ? email.ok : true);
+  return NextResponse.json({ ok, ...result, quickbooks, email }, { status: ok ? 200 : 207 });
 }
