@@ -178,3 +178,67 @@ describe('searchCommands', () => {
     expect([...order].sort((a, b) => canonical.indexOf(a) - canonical.indexOf(b))).toEqual(order);
   });
 });
+
+describe('email-era record commands (Phase E)', () => {
+  const extended = buildRecordCommands({
+    ...data,
+    customers: [
+      { id: 'c1', jobberClientId: 'jc1', name: 'JR Sherman', email: 'jr@shermanbuilds.com', createdAt: '', updatedAt: '' },
+    ],
+    candidates: [
+      {
+        id: 'cd1',
+        source: 'email' as const,
+        emailThreadId: 'th1',
+        company: 'Turner Construction',
+        contactName: 'GC',
+        summary: 'Warehouse flooring inquiry',
+        estimatedScope: '18,000 SF',
+        location: 'King of Prussia, PA',
+        status: 'new' as const,
+        createdAt: '2026-09-30T10:00:00Z',
+      },
+    ],
+    threads: [
+      {
+        id: 'th1',
+        providerThreadId: 'x',
+        subject: 'Warehouse flooring request',
+        participants: [{ address: 'gc@turnerconstruction.com', name: 'Turner GC' }],
+        messageCount: 2,
+        lastMessageAt: '2026-09-30T10:00:00Z',
+        status: 'open' as const,
+        firstDetectedAt: '2026-09-30T10:00:00Z',
+      },
+    ],
+  });
+
+  it('indexes customers, candidates, and threads — all read-only', () => {
+    expect(() => assertReadOnly(extended)).not.toThrow();
+    const ids = extended.map((c) => c.id);
+    expect(ids).toContain('customer:c1');
+    expect(ids).toContain('candidate:cd1');
+    expect(ids).toContain('thread:th1');
+  });
+
+  it('finds a customer by name and routes to the Customer 360 page', () => {
+    const groups = searchCommands('sherman', [...STATIC_COMMANDS, ...extended]);
+    const hit = groups.flatMap((g) => g.items).find((i) => i.command.id === 'customer:c1');
+    expect(hit?.command.href).toBe('/customers/c1');
+  });
+
+  it('finds an opportunity by company or location and opens its email thread', () => {
+    for (const q of ['turner', 'king of prussia']) {
+      const groups = searchCommands(q, extended);
+      const hit = groups.flatMap((g) => g.items).find((i) => i.command.id === 'candidate:cd1');
+      expect(hit, q).toBeDefined();
+      expect(hit!.command.href).toBe('/opportunities?thread=th1');
+    }
+  });
+
+  it('finds an email thread by participant address', () => {
+    const groups = searchCommands('turnerconstruction', extended);
+    const hit = groups.flatMap((g) => g.items).find((i) => i.command.id === 'thread:th1');
+    expect(hit).toBeDefined();
+  });
+});

@@ -20,7 +20,7 @@
  * on the server (index building), and in the browser (per-keystroke search).
  */
 
-import type { Invoice, Job, Lead, Quote, Transaction } from '@/lib/db/types';
+import type { Customer, EmailThread, Invoice, Job, Lead, LeadCandidate, Quote, Transaction } from '@/lib/db/types';
 
 // ── command model ────────────────────────────────────────────────────────────
 
@@ -29,6 +29,9 @@ export type CommandKind = 'navigate' | 'view' | 'record' | 'action' | 'ask-claud
 export type CommandCategory =
   | 'Navigation'
   | 'Views'
+  | 'Customers'
+  | 'Opportunities'
+  | 'Email'
   | 'Leads'
   | 'Jobs'
   | 'Quotes'
@@ -114,6 +117,8 @@ export const STATIC_COMMANDS: Command[] = [
   nav('todo', 'Go to To Do', '/todo', 'check', ['tasks', 'task list', 'checklist']),
   nav('calendar', 'Go to Calendar', '/calendar', 'calendar', ['schedule', 'week', 'month', 'events']),
   nav('company', 'Go to Command Center', '/company', 'pulse', ['dashboard', 'kpi', 'business', 'pulse', 'attention']),
+  nav('opportunities', 'Go to Opportunities', '/opportunities', 'inbox', ['email leads', 'bids', 'inbox', 'candidates', 'detected']),
+  nav('customers', 'Go to Customers', '/customers', 'leads', ['clients', 'accounts', 'people']),
   nav('leads', 'Go to Leads', '/leads', 'leads', ['prospects', 'requests', 'opportunities']),
   nav('jobs', 'Go to Jobs', '/jobs', 'jobs', ['work', 'projects', 'schedule']),
   nav('quotes', 'Go to Quotes & Invoices', '/quotes', 'quotes', ['estimates', 'proposals', 'invoices', 'billing', 'ar']),
@@ -141,6 +146,10 @@ export interface CommandIndexData {
   quotes: Quote[];
   invoices: Invoice[];
   transactions: Transaction[];
+  /** Optional — present once the customer entity / email intelligence exist. */
+  customers?: Customer[];
+  candidates?: LeadCandidate[];
+  threads?: EmailThread[];
 }
 
 /** Cap per entity so a pathological table can't bloat the payload. */
@@ -228,6 +237,52 @@ export function buildRecordCommands(data: CommandIndexData): Command[] {
       hint: t.categoryId.replace(/_/g, ' '),
       amount: Math.abs(t.amount) || undefined,
       date: t.date,
+      mutates: false,
+    });
+  }
+
+  for (const c of (data.customers ?? []).slice(0, INDEX_CAP)) {
+    out.push({
+      id: `customer:${c.id}`,
+      kind: 'record',
+      label: c.name,
+      category: 'Customers',
+      keywords: [c.email ?? '', c.phone ?? ''].filter(Boolean),
+      icon: 'leads',
+      href: `/customers/${c.id}`,
+      hint: c.email ?? c.phone,
+      mutates: false,
+    });
+  }
+
+  for (const c of (data.candidates ?? []).slice(0, INDEX_CAP)) {
+    out.push({
+      id: `candidate:${c.id}`,
+      kind: 'record',
+      label: c.company || c.contactName || 'Opportunity',
+      category: 'Opportunities',
+      keywords: [c.contactName, c.contactEmail ?? '', c.location ?? '', c.estimatedScope ?? '', c.summary].filter(Boolean),
+      icon: 'inbox',
+      href: c.emailThreadId ? `/opportunities?thread=${c.emailThreadId}` : '/opportunities',
+      hint: [c.estimatedScope, c.location].filter(Boolean).join(' · ') || c.summary,
+      status: c.status,
+      date: c.createdAt,
+      mutates: false,
+    });
+  }
+
+  for (const t of (data.threads ?? []).slice(0, INDEX_CAP)) {
+    out.push({
+      id: `thread:${t.id}`,
+      kind: 'record',
+      label: t.subject || '(no subject)',
+      category: 'Email',
+      keywords: t.participants.flatMap((p) => [p.name ?? '', p.address]).filter(Boolean),
+      icon: 'inbox',
+      href: `/opportunities?thread=${t.id}`,
+      hint: t.participants.map((p) => p.name || p.address).join(', '),
+      status: t.status,
+      date: t.lastMessageAt,
       mutates: false,
     });
   }
@@ -335,10 +390,13 @@ const CATEGORY_ORDER: CommandCategory[] = [
   'Actions',
   'Navigation',
   'Views',
+  'Opportunities',
+  'Customers',
   'Leads',
   'Jobs',
   'Quotes',
   'Invoices',
+  'Email',
   'Transactions',
 ];
 

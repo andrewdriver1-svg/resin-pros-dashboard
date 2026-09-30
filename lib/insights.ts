@@ -385,6 +385,8 @@ export function computeAttention(
     attentionStates?: Map<string, AttentionStateRecord>;
     /** Latest recorded Jobber sync run, for the missed-sync alert. */
     jobberSync?: { ranAt: string; ok: boolean } | null;
+    /** Latest recorded email sync run (only when email is connected). */
+    emailSync?: { ranAt: string; ok: boolean } | null;
   },
   now: Date = new Date(),
 ): AttentionItem[] {
@@ -416,6 +418,34 @@ export function computeAttention(
         title: 'Jobber sync overdue',
         urgent: true,
         detail: `No sync recorded for ${Math.floor(hoursAgo / 24)}+ days (expected daily). Job/quote/invoice numbers may be stale.`,
+        href: '/settings',
+        linkLabel: 'Open settings',
+        value: 0,
+      });
+    }
+  }
+
+  if (data.emailSync) {
+    const ranMs = new Date(data.emailSync.ranAt).getTime();
+    const hoursAgo = Math.floor((nowMs - ranMs) / 3_600_000);
+    if (!data.emailSync.ok) {
+      items.push({
+        id: 'sync-email',
+        severity: 'high',
+        urgent: true,
+        title: 'Email sync FAILED on its last run',
+        detail: `The last attempt ${hoursAgo}h ago recorded errors — new leads and customer replies may be missing. Check Settings → Email.`,
+        href: '/settings',
+        linkLabel: 'Open settings',
+        value: 0,
+      });
+    } else if (Number.isFinite(ranMs) && nowMs - ranMs > 36 * 3_600_000) {
+      items.push({
+        id: 'sync-email',
+        severity: 'high',
+        urgent: true,
+        title: 'Email sync overdue',
+        detail: `No email sync recorded for ${Math.floor(hoursAgo / 24)}+ days — the lead inbox may be behind.`,
         href: '/settings',
         linkLabel: 'Open settings',
         value: 0,
