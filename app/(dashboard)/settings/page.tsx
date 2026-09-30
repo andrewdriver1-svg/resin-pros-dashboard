@@ -3,11 +3,13 @@ import { businessConfig } from '@/config/business.config';
 import { getGoogleBusinessSnapshot, getSyncRuns } from '@/lib/db';
 import { isJobberConfigured, loadJobberTokens } from '@/lib/jobber/client';
 import { isQuickBooksConfigured, loadQuickBooksTokens } from '@/lib/quickbooks/client';
+import { isEmailConfigured, loadEmailAccount } from '@/lib/email/gmail';
 import { isSupabaseConfigured } from '@/lib/supabase/env';
 import { PageHeader, Card } from '@/app/components/ui';
 import { TableSkeleton } from '@/app/components/states';
 import { GoogleBusinessForm } from '@/app/components/GoogleBusinessForm';
 import { SyncNowButton } from '@/app/components/SyncNowButton';
+import { EmailSyncButton } from '@/app/components/EmailSyncButton';
 
 export const dynamic = 'force-dynamic';
 
@@ -50,7 +52,7 @@ function OAuthNotice({ provider, code }: { provider: string; code: string | unde
 export default async function SettingsPage({
   searchParams,
 }: {
-  searchParams: Promise<{ jobber?: string; quickbooks?: string }>;
+  searchParams: Promise<{ jobber?: string; quickbooks?: string; email?: string }>;
 }) {
   const params = await searchParams;
   return (
@@ -59,6 +61,7 @@ export default async function SettingsPage({
 
       <OAuthNotice provider="Jobber" code={params.jobber} />
       <OAuthNotice provider="QuickBooks" code={params.quickbooks} />
+      <OAuthNotice provider="Email" code={params.email} />
 
       <Card title="Business">
         <dl className="grid grid-cols-1 gap-3 text-sm sm:grid-cols-2">
@@ -76,6 +79,10 @@ export default async function SettingsPage({
 
       <Suspense fallback={<TableSkeleton rows={2} />}>
         <QuickBooksCard />
+      </Suspense>
+
+      <Suspense fallback={<TableSkeleton rows={2} />}>
+        <EmailCard />
       </Suspense>
 
       <Card title="Google Business Profile & social">
@@ -198,6 +205,70 @@ async function QuickBooksCard() {
               {connected ? 'Reconnect QuickBooks' : 'Connect QuickBooks'}
             </a>
           </div>
+        </div>
+      )}
+    </Card>
+  );
+}
+
+async function EmailCard() {
+  const configured = isEmailConfigured();
+  const [account, runs] = await Promise.all([
+    configured ? loadEmailAccount() : Promise.resolve(null),
+    getSyncRuns('email', 3),
+  ]);
+  const connected = Boolean(account && account.status !== 'disconnected');
+
+  return (
+    <Card title="Business email (read-only)">
+      {!configured ? (
+        <p className="text-sm text-ink-3">
+          Google OAuth credentials aren&apos;t set. Add <code className="rounded bg-panel-2 px-1 py-0.5">GOOGLE_CLIENT_ID</code> and{' '}
+          <code className="rounded bg-panel-2 px-1 py-0.5">GOOGLE_CLIENT_SECRET</code> (a Google Cloud OAuth client with the Gmail
+          API enabled and the <code className="rounded bg-panel-2 px-1 py-0.5">gmail.readonly</code> scope), then connect.
+        </p>
+      ) : (
+        <div className="space-y-4">
+          <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+            <div className="text-sm">
+              <span className={`inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium ${connected ? 'bg-emerald-400/10 ring-1 ring-inset ring-emerald-400/20 text-emerald-300' : 'bg-amber-400/10 ring-1 ring-inset ring-amber-400/20 text-amber-300'}`}>
+                {connected ? 'Connected' : 'Not connected'}
+              </span>
+              <p className="mt-1 text-ink-3">
+                {connected
+                  ? `Reading ${account?.address || 'the mailbox'} for leads and bid opportunities. This connection can only read — it never sends, deletes, or changes mail.`
+                  : 'Authorize read-only access to surface leads and bid invitations from email.'}
+              </p>
+              {account?.status === 'error' && account.lastError && (
+                <p className="mt-1 text-xs text-bad">Last sync error: {account.lastError}</p>
+              )}
+            </div>
+            <div className="flex items-center gap-2">
+              {connected && <EmailSyncButton />}
+              <a
+                href="/api/email/connect"
+                className="inline-flex items-center rounded-lg bg-accent px-4 py-2 text-sm font-medium text-surface transition hover:bg-accent-soft"
+              >
+                {connected ? 'Reconnect Gmail' : 'Connect Gmail (read-only)'}
+              </a>
+            </div>
+          </div>
+          {runs.length > 0 && (
+            <div className="text-xs text-ink-4">
+              <span className="font-semibold uppercase tracking-wide">Recent syncs</span>
+              <ul className="mt-1 space-y-0.5">
+                {runs.map((r) => (
+                  <li key={r.id}>
+                    <span className={r.ok ? 'text-good' : 'text-bad'}>●</span>{' '}
+                    {new Date(r.ranAt).toLocaleString('en-US', { timeZone: businessConfig.contact.timezone, month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' })}{' '}
+                    — {r.ok
+                      ? `${r.messagesScanned} scanned · ${r.messagesRelevant} relevant · ${r.candidatesCreated} candidate${r.candidatesCreated === 1 ? '' : 's'}`
+                      : r.errors.join('; ') || 'failed'}
+                  </li>
+                ))}
+              </ul>
+            </div>
+          )}
         </div>
       )}
     </Card>
